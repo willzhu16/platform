@@ -1,0 +1,8 @@
+# Linux-canonical repo (D-20): normalise all text to LF in the repository and on
+# checkout, so bash scripts and YAML behave identically on Windows, WSL2, and CI runners.
+* text=auto eol=lf
+
+# Binary assets git must not touch.
+*.png binary
+*.zip binary
+*.gz binary

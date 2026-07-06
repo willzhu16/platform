@@ -1,0 +1,119 @@
+name: ci-reusable
+
+# Reusable TS PR pipeline (spec 01). Callers name their job `ci`, so the checks
+# surface as `ci / lint`, `ci / typecheck`, `ci / test`, `ci / commits` — the frozen
+# check names that rulesets, the review protocol (spec 04), and release gating (spec
+# 07) reference by exact string. Renaming a check name is a breaking change (D-18).
+#
+# This workflow knows nothing about tools: it calls the package.json scripts `lint`,
+# `typecheck`, and `test` (the script contract, spec 01 §2.1). A project swaps tools
+# by changing those scripts, never this file.
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        type: string
+        default: '24'
+      package-manager:
+        type: string
+        default: 'pnpm' # 'pnpm' | 'npm'
+      working-directory:
+        type: string
+        default: '.'
+      enforce-conventional-commits:
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        if: inputs.package-manager == 'pnpm'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: ${{ inputs.package-manager }}
+          cache-dependency-path: ${{ inputs.working-directory }}
+      - name: Install
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          if [ "${{ inputs.package-manager }}" = "pnpm" ]; then
+            pnpm install --frozen-lockfile
+          else
+            npm ci
+          fi
+      - name: Lint
+        working-directory: ${{ inputs.working-directory }}
+        run: ${{ inputs.package-manager }} run lint
+
+  typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        if: inputs.package-manager == 'pnpm'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: ${{ inputs.package-manager }}
+          cache-dependency-path: ${{ inputs.working-directory }}
+      - name: Install
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          if [ "${{ inputs.package-manager }}" = "pnpm" ]; then
+            pnpm install --frozen-lockfile
+          else
+            npm ci
+          fi
+      - name: Typecheck
+        working-directory: ${{ inputs.working-directory }}
+        run: ${{ inputs.package-manager }} run typecheck
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        if: inputs.package-manager == 'pnpm'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: ${{ inputs.package-manager }}
+          cache-dependency-path: ${{ inputs.working-directory }}
+      - name: Install
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          if [ "${{ inputs.package-manager }}" = "pnpm" ]; then
+            pnpm install --frozen-lockfile
+          else
+            npm ci
+          fi
+      - name: Test
+        working-directory: ${{ inputs.working-directory }}
+        run: ${{ inputs.package-manager }} run test
+
+  commits:
+    if: inputs.enforce-conventional-commits && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: wagoid/commitlint-github-action@v6
+        with:
+          configFile: .commitlintrc.json # shipped by templates; extends
+                                          # @commitlint/config-conventional

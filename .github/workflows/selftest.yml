@@ -1,0 +1,32 @@
+name: selftest
+
+# Gates changes to the reusable workflows with the workflows themselves (spec 01 §6.4).
+# On any platform PR that touches a reusable CI workflow or a fixture, run ci.yml and
+# ci-python.yml against their minimal fixtures via LOCAL references. If a required check
+# name is renamed, or the pipeline breaks, this goes red — the interface-freeze tripwire
+# (acceptance test 6). The fixtures double as the living example of the script contract.
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/ci.yml'
+      - '.github/workflows/ci-python.yml'
+      - '.github/workflows/selftest.yml'
+      - 'selftest-fixture/**'
+      - 'selftest-fixture-py/**'
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+    with:
+      working-directory: selftest-fixture
+
+  # enforce-conventional-commits is left to the ci job above so commitlint runs once.
+  ci-python:
+    uses: ./.github/workflows/ci-python.yml
+    with:
+      working-directory: selftest-fixture-py
+      enforce-conventional-commits: false

@@ -1,0 +1,92 @@
+name: ci-python-reusable
+
+# Reusable Python PR pipeline (spec 01, D-21). A one-for-one mirror of ci.yml that
+# emits the IDENTICAL frozen check names (`ci / lint`, `ci / typecheck`, `ci / test`,
+# `ci / commits`) — that identity is the multi-language contract: rulesets, the review
+# protocol, and release gating never know or care which language a repo is.
+#
+# Python has no package.json-scripts idiom worth imitating, so the jobs call the tools
+# directly through uv (ruff / pyright / pytest). A project customises behaviour through
+# tool config files (ruff.toml, pyrightconfig.json, pytest ini), not by renaming
+# commands. The `commits` job is shared verbatim with ci.yml.
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        type: string
+        default: '3.13'
+      working-directory:
+        type: string
+        default: '.'
+      enforce-conventional-commits:
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ inputs.python-version }}
+      - name: Install
+        working-directory: ${{ inputs.working-directory }}
+        run: uv sync --frozen
+      - name: Lint
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+
+  typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ inputs.python-version }}
+      - name: Install
+        working-directory: ${{ inputs.working-directory }}
+        run: uv sync --frozen
+      - name: Typecheck
+        working-directory: ${{ inputs.working-directory }}
+        run: uv run pyright
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ inputs.python-version }}
+      - name: Install
+        working-directory: ${{ inputs.working-directory }}
+        run: uv sync --frozen
+      - name: Test
+        working-directory: ${{ inputs.working-directory }}
+        run: uv run pytest --cov
+
+  commits:
+    if: inputs.enforce-conventional-commits && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: wagoid/commitlint-github-action@v6
+        with:
+          configFile: .commitlintrc.json # shipped by templates; extends
+                                          # @commitlint/config-conventional
