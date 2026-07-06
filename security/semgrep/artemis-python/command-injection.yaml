@@ -1,0 +1,36 @@
+rules:
+  - id: artemis-py-subprocess-shell-true
+    message: >-
+      subprocess with shell=True runs the command through a shell; combined with
+      non-literal input this is a command-injection risk. Pass a list of arguments and
+      leave shell=False (the default).
+    languages: [python]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: 'CWE-78: Improper Neutralization of Special Elements used in an OS Command'
+      references:
+        - https://owasp.org/www-community/attacks/Command_Injection
+    patterns:
+      - pattern-either:
+          - pattern: subprocess.call(..., shell=True, ...)
+          - pattern: subprocess.run(..., shell=True, ...)
+          - pattern: subprocess.Popen(..., shell=True, ...)
+          - pattern: subprocess.check_output(..., shell=True, ...)
+          - pattern: subprocess.check_call(..., shell=True, ...)
+
+  - id: artemis-py-eval-exec-nonliteral
+    message: >-
+      eval()/exec() on a non-literal value executes arbitrary code. Remove it, or use a
+      safe parser (ast.literal_eval for literals, json.loads for JSON).
+    languages: [python]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: 'CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code'
+    patterns:
+      - pattern-either:
+          - pattern: eval($X)
+          - pattern: exec($X)
+      - pattern-not: eval('...')
+      - pattern-not: exec('...')

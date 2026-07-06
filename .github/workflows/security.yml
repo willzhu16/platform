@@ -1,0 +1,132 @@
+name: security-reusable
+
+# Reusable security pipeline (spec 02). Callers name their job `security`, so the checks
+# surface as the frozen names `security / gitleaks`, `security / semgrep`, `security /
+# osv` — reserved in spec 01 §2.3 and required by every project's main ruleset. All three
+# scanners run UNAUTHENTICATED: this workflow takes no secrets by design, so it is
+# callable from public and private repos alike with zero access configuration.
+#
+# Language-agnostic by construction: gitleaks scans text, semgrep selects rules per file
+# type, osv-scanner reads any supported lockfile. One workflow serves TS and Python — no
+# security-python.yml exists (D-21's per-language split applies only to CI toolchains).
+#
+# The shared gitleaks config and semgrep rules live in this same `platform` repo. Because
+# a reusable workflow's `github.*` context reflects the CALLER, we locate platform via
+# `${{ github.repository_owner }}/platform` (correct under D-20: one account owns every
+# repo) and sparse-check-out its default branch. spec 09 migrates this to pinned refs.
+
+on:
+  workflow_call:
+    inputs:
+      semgrep-config:
+        type: string
+        default: '' # optional extra rules appended to the shared set
+      osv-lockfiles:
+        type: string
+        default: 'auto' # explicit lockfile paths if auto-detection misfires
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  GITLEAKS_VERSION: '8.30.1'
+  SEMGREP_VERSION: '1.168.0'
+  # Bumped as reviewable PRs in platform; Renovate-managed from spec 09.
+
+jobs:
+  gitleaks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout (full history for diff-scope and push scans)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fetch shared gitleaks config from platform
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/platform
+          sparse-checkout: security/gitleaks.toml
+          sparse-checkout-cone-mode: false
+          path: .artemis-platform
+      - name: Install gitleaks (verified against published checksums)
+        run: |
+          tarball="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          curl -sSLf -o "$tarball" "${base}/${tarball}"
+          curl -sSLf -o checksums.txt "${base}/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          grep "  ${tarball}$" checksums.txt | sha256sum -c -
+          tar -xzf "$tarball" gitleaks
+          install -m 0755 gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+      - name: Scan (PR = diff range; push = full working tree)
+        run: |
+          config=.artemis-platform/security/gitleaks.toml
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            gitleaks detect --source . --config "$config" --redact --no-banner \
+              --log-opts "${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
+          else
+            gitleaks detect --source . --config "$config" --redact --no-banner
+          fi
+      - name: Leak-response runbook (on finding)
+        if: failure()
+        run: |
+          {
+            echo "### 🔑 gitleaks found a potential secret"
+            echo ""
+            echo "Treat as real. Follow the leak-response runbook: **rotate the credential"
+            echo "first**, then purge it from git history — never the reverse (public repos"
+            echo "are scraped within minutes)."
+            echo ""
+            echo "Runbook: \`security/runbooks/leak.md\` (spec 06)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  semgrep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code to scan
+        uses: actions/checkout@v4
+      - name: Fetch shared semgrep rules from platform
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/platform
+          sparse-checkout: security/semgrep
+          sparse-checkout-cone-mode: false
+          path: .artemis-platform
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install semgrep (OSS engine)
+        run: pip install "semgrep==${SEMGREP_VERSION}"
+      - name: Scan
+        run: |
+          extra=""
+          if [ -n "${{ inputs.semgrep-config }}" ]; then
+            extra="--config ${{ inputs.semgrep-config }}"
+          fi
+          semgrep scan \
+            --config .artemis-platform/security/semgrep \
+            $extra \
+            --error --metrics=off --no-git-ignore \
+            --exclude .artemis-platform
+
+  osv:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: OSV scan (lockfiles)
+        # 'auto' scans the repo recursively (osv-scanner finds every supported lockfile);
+        # pass explicit paths via the osv-lockfiles input when auto-detection misfires.
+        # An in-repo osv-scanner.toml may ignore specific advisory IDs (spec 02 §3.3).
+        uses: google/osv-scanner-action/osv-scanner-action@v2.3.8
+        with:
+          scan-args: |-
+            --recursive
+            ${{ inputs.osv-lockfiles == 'auto' && './' || inputs.osv-lockfiles }}

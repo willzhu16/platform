@@ -1,0 +1,55 @@
+name: history-scan
+
+# Manual full-history secret scan (spec 02 §3.5) — NOT a PR gate. Run once per pre-Artemis
+# repo during onboarding, where secret debt is assumed to exist (OPEN-QUESTIONS Q5). It
+# scans every commit (not just a diff) and uploads the report as a private artifact;
+# findings are handled per the leak-response runbook (rotate first, then purge history).
+# A red run here is expected on a legacy repo — it means "secrets found, go handle them".
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GITLEAKS_VERSION: '8.30.1'
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fetch shared gitleaks config from platform
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/platform
+          sparse-checkout: security/gitleaks.toml
+          sparse-checkout-cone-mode: false
+          path: .artemis-platform
+      - name: Install gitleaks (verified against published checksums)
+        run: |
+          tarball="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          curl -sSLf -o "$tarball" "${base}/${tarball}"
+          curl -sSLf -o checksums.txt "${base}/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          grep "  ${tarball}$" checksums.txt | sha256sum -c -
+          tar -xzf "$tarball" gitleaks
+          install -m 0755 gitleaks /usr/local/bin/gitleaks
+      - name: Scan all history
+        run: |
+          gitleaks detect --source . \
+            --config .artemis-platform/security/gitleaks.toml \
+            --redact --no-banner \
+            --report-format json --report-path gitleaks-history-report.json
+      - name: Upload report (private artifact)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-history-report
+          path: gitleaks-history-report.json
+          if-no-files-found: warn

@@ -1,0 +1,31 @@
+rules:
+  - id: artemis-js-child-process-exec
+    message: >-
+      child_process.exec()/execSync() spawns a shell; a non-literal command is a
+      command-injection risk. Use execFile()/spawn() with an argument array instead.
+    languages: [javascript, typescript]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: 'CWE-78: Improper Neutralization of Special Elements used in an OS Command'
+      references:
+        - https://owasp.org/www-community/attacks/Command_Injection
+    patterns:
+      - pattern-either:
+          - pattern: child_process.exec($CMD, ...)
+          - pattern: child_process.execSync($CMD, ...)
+      - pattern-not: child_process.exec('...', ...)
+      - pattern-not: child_process.execSync('...', ...)
+
+  - id: artemis-js-eval-nonliteral
+    message: >-
+      eval() on a non-literal value executes arbitrary code. Remove it, or parse the
+      input with a purpose-built parser (e.g. JSON.parse for JSON).
+    languages: [javascript, typescript]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: 'CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code'
+    patterns:
+      - pattern: eval($X)
+      - pattern-not: eval('...')

@@ -1,0 +1,34 @@
+# Artemis shared gitleaks config (spec 02 §3.1).
+# Extends the gitleaks default ruleset (broad, well-maintained coverage) with custom
+# rules for the credential shapes this environment issues: Cloudflare API tokens, age
+# private keys, GitHub fine-grained PATs, and ntfy topic URLs. A finding is a hard fail
+# — rotate first, then purge history (security/runbooks/leak.md, spec 06).
+
+title = "Artemis platform gitleaks config"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "artemis-age-secret-key"
+description = "age private key (SOPS master key — losing/leaking this compromises every encrypted secret)"
+regex = '''AGE-SECRET-KEY-1[0-9A-Z]{58}'''
+keywords = ["age-secret-key-1"]
+
+[[rules]]
+id = "artemis-github-fine-grained-pat"
+description = "GitHub fine-grained personal access token"
+regex = '''github_pat_[0-9a-zA-Z_]{82}'''
+keywords = ["github_pat_"]
+
+[[rules]]
+id = "artemis-cloudflare-api-token"
+description = "Cloudflare API token (project-scoped deploy credential)"
+regex = '''(?i)(?:cloudflare|cf[_-]?api)[^\n]{0,40}?['"=:\s]([A-Za-z0-9_-]{40})(?:['"\s]|$)'''
+keywords = ["cloudflare", "cf_api", "cf-api"]
+
+[[rules]]
+id = "artemis-ntfy-topic-url"
+description = "ntfy topic URL (anyone holding it can push alerts to the owner's phone — treat as a secret, spec 08)"
+regex = '''https?://ntfy\.sh/[A-Za-z0-9_-]{8,}'''
+keywords = ["ntfy.sh/"]

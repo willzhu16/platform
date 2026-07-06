@@ -1,0 +1,41 @@
+name: codeql-reusable
+
+# Deep data-flow SAST via CodeQL (spec 02 §3.4). Free only for public repos, so templates
+# wire the caller (job id `codeql`) ONLY when visibility == public — the single place the
+# pipeline differs by visibility (D-12). Public repos' rulesets require `codeql / analyze`.
+#
+# One `analyze` job handles every language in a single CodeQL database run. It is
+# deliberately NOT a matrix: a matrix would append the language to the job name
+# (`analyze (python)`), breaking the frozen `codeql / analyze` check name that rulesets
+# require. Multi-language repos pass a comma-separated `languages` value instead.
+#
+# The calling job must grant `security-events: write` (to upload results) — templates set
+# that in the consumer snippet (spec 03); a reusable workflow cannot exceed the caller's
+# granted permissions.
+
+on:
+  workflow_call:
+    inputs:
+      languages:
+        type: string
+        default: 'javascript-typescript' # e.g. 'python' or 'javascript-typescript,python'
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read # required for CodeQL on private repos; harmless on public
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ inputs.languages }}
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3
