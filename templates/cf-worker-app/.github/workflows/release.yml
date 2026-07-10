@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing vX.Y.Z tag to rebuild and redeploy (rollback runbook)
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -11,3 +17,7 @@ permissions:
 jobs:
   release:
     uses: willzhu16/platform/.github/workflows/release.yml@v1
+    with:
+      tag: ${{ inputs.tag || '' }}
+      deploy: true
+    secrets: inherit

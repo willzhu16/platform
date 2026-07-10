@@ -1,0 +1,166 @@
+name: release-reusable
+
+# Reusable tag-driven release pipeline (spec 07). Callers name their job `release`, so
+# the checks surface as `release / build` and `release / deploy` — frozen check names
+# that release gating references by exact string; renaming one is a breaking change
+# (D-18). The flow: merge → release PR (release-please, shipped by templates) → human
+# merges → tag vX.Y.Z → this workflow builds ONCE from the tag, attaches the artifact
+# to the GitHub Release, and deploys that artifact — never a branch tip.
+#
+# Callers trigger on `push: tags: v*` and also expose `workflow_dispatch` with a `tag`
+# input forwarded here, so the rollback runbook's
+# `gh workflow run release.yml -f tag=vX.Y.Z` redeploys an exact earlier version.
+#
+# Secrets: the deploy job runs in the CALLER's `production` environment (tag-gated by
+# new-project bootstrap, spec 03 §5.6); callers use `secrets: inherit` so the
+# environment-scoped CLOUDFLARE_API_TOKEN resolves there. No other job sees secrets
+# (spec 07 acceptance test 6).
+#
+# The `publish` extension point (npm/Marketplace, spec 09's SBOM/signing) is the
+# no-op `publish-command` input — it runs in the build job after the artifact upload.
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        default: '' # empty → the pushed tag (github.ref_name)
+      language:
+        type: string
+        default: 'ts' # 'ts' | 'python'
+      deploy:
+        type: boolean
+        default: false # cf-worker-app passes true; artifact-only projects keep false
+      publish-command:
+        type: string
+        default: '' # extension point: runs after the artifact upload when non-empty
+      working-directory:
+        type: string
+        default: '.'
+      node-version:
+        type: string
+        default: '24'
+      python-version:
+        type: string
+        default: '3.13'
+
+permissions:
+  contents: write # attach artifacts to the GitHub Release
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - name: Resolve release tag
+        id: tag
+        # Guard the shape so a workflow_dispatch typo can never build or deploy from
+        # a branch name — only plain vX.Y.Z tags exist here (D-18).
+        run: |
+          tag="${{ inputs.tag != '' && inputs.tag || github.ref_name }}"
+          if echo "$tag" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::'$tag' is not a vX.Y.Z release tag"
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+      - uses: pnpm/action-setup@v4
+        if: inputs.language == 'ts'
+        with:
+          # Resolve the pnpm version from the project's packageManager field — the
+          # default looks at the caller repo root, which may have no package.json.
+          package_json_file: ${{ inputs.working-directory }}/package.json
+      - uses: actions/setup-node@v4
+        if: inputs.language == 'ts'
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: pnpm
+          cache-dependency-path: ${{ inputs.working-directory }}/pnpm-lock.yaml
+      - uses: astral-sh/setup-uv@v6
+        if: inputs.language == 'python'
+        with:
+          python-version: ${{ inputs.python-version }}
+      - name: Build
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          if [ "${{ inputs.language }}" = "ts" ]; then
+            pnpm install --frozen-lockfile
+            pnpm build
+          else
+            uv build
+          fi
+      - name: Attach artifact and hashes to the GitHub Release
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag='${{ steps.tag.outputs.tag }}'
+          tar -czf "release-${tag}.tar.gz" -C dist .
+          gh release upload "$tag" "release-${tag}.tar.gz" --clobber
+          # Record artifact + lockfile hashes in the release body (spec 07 §2.2).
+          hash_targets="release-${tag}.tar.gz"
+          for lockfile in pnpm-lock.yaml uv.lock; do
+            [ -f "$lockfile" ] && hash_targets="$hash_targets $lockfile"
+          done
+          {
+            gh release view "$tag" --json body --jq '.body // ""'
+            echo
+            echo '```'
+            # shellcheck disable=SC2086 — word-splitting the file list is intended
+            sha256sum $hash_targets
+            echo '```'
+          } > "$RUNNER_TEMP/release-notes.md"
+          gh release edit "$tag" --notes-file "$RUNNER_TEMP/release-notes.md"
+      - name: Publish (extension point)
+        if: inputs.publish-command != ''
+        working-directory: ${{ inputs.working-directory }}
+        run: ${{ inputs.publish-command }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-dist
+          path: ${{ inputs.working-directory }}/dist/
+          if-no-files-found: error
+
+  deploy:
+    if: inputs.deploy
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production # caller's environment: tag-gated, holds the CF token
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build.outputs.tag }}
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: ${{ inputs.working-directory }}/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: pnpm
+          cache-dependency-path: ${{ inputs.working-directory }}/pnpm-lock.yaml
+      - name: Install
+        working-directory: ${{ inputs.working-directory }}
+        run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-dist
+          path: ${{ inputs.working-directory }}/dist
+      - name: Deploy the built artifact
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          # Deploy exactly what `build` produced (build-once): the bundled entry
+          # point, no re-bundling. PROJECT_VERSION pins /healthz to the tag.
+          pnpm exec wrangler deploy dist/index.js --no-bundle \
+            --var "PROJECT_VERSION:${{ needs.build.outputs.tag }}"

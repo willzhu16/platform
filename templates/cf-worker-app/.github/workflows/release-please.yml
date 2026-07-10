@@ -1,0 +1,24 @@
+name: release-please
+
+# release-please for this project (spec 07 §2.3, D-14). On every push to main it
+# maintains a running "chore: release vX.Y.Z" PR from Conventional Commits. Merging
+# that PR is the human release decision — never merged by an agent — and tags vX.Y.Z,
+# cuts a GitHub Release with a changelog, and hands over to release.yml.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

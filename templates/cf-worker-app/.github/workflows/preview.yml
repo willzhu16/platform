@@ -1,0 +1,13 @@
+name: preview
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  preview:
+    uses: willzhu16/platform/.github/workflows/preview.yml@v1
+    secrets: inherit
