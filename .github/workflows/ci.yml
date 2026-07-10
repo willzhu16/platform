@@ -40,6 +40,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         if: inputs.package-manager == 'pnpm'
+        with:
+          # Resolve the pnpm version from the project's packageManager field — the
+          # default looks at the CALLER repo root, which may have no package.json.
+          package_json_file: ${{ inputs.working-directory }}/package.json
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node-version }}
@@ -68,6 +72,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         if: inputs.package-manager == 'pnpm'
+        with:
+          # Resolve the pnpm version from the project's packageManager field — the
+          # default looks at the CALLER repo root, which may have no package.json.
+          package_json_file: ${{ inputs.working-directory }}/package.json
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node-version }}
@@ -96,6 +104,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         if: inputs.package-manager == 'pnpm'
+        with:
+          # Resolve the pnpm version from the project's packageManager field — the
+          # default looks at the CALLER repo root, which may have no package.json.
+          package_json_file: ${{ inputs.working-directory }}/package.json
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node-version }}
