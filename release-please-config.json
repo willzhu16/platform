@@ -3,7 +3,8 @@
   "release-type": "simple",
   "packages": {
     ".": {
-      "component": "platform"
+      "component": "platform",
+      "include-component-in-tag": false
     }
   }
 }
