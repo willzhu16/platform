@@ -1,6 +1,6 @@
 {
   "athenaVersion": "v1",
-  "stack": "py",
+  "stack": "python",
   "targets": [],
   "tools": ["claude", "codex"],
   "review": {

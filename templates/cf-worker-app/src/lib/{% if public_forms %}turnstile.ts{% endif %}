@@ -18,6 +18,10 @@ export const verifyTurnstile = async (
     method: 'POST',
     body,
   });
+  if (!response.ok) {
+    // Fail closed: a siteverify outage must reject the submission, not throw mid-handler.
+    return false;
+  }
   const result = (await response.json()) as { success: boolean };
   return result.success === true;
 };
