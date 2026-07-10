@@ -118,7 +118,7 @@ step '5. Create GitHub repo'
 if gh repo view "${OWNER}/${NAME}" >/dev/null 2>&1; then
   ok "${OWNER}/${NAME} already exists — skipping create"
 else
-  gh repo create "${OWNER}/${NAME}" "--${VISIBILITY}" --source . --push \
+  gh repo create "${OWNER}/${NAME}" "--${VISIBILITY}" --description "$DESCRIPTION" --source . --push \
     || fail 'gh repo create failed'
   ok "created ${OWNER}/${NAME} (${VISIBILITY}) and pushed main"
 fi
@@ -144,9 +144,10 @@ step '7. Deployment environments'
 DEPLOYS="$(jq '.targets | length' .athena/config.json 2>/dev/null || echo 0)"
 if [ "$DEPLOYS" -gt 0 ]; then
   gh api --method PUT "repos/${OWNER}/${NAME}/environments/preview" >/dev/null
+  # -F (typed), not -f: the API rejects the strings "true"/"false" for these booleans.
   gh api --method PUT "repos/${OWNER}/${NAME}/environments/production" \
-    -f 'deployment_branch_policy[protected_branches]=false' \
-    -f 'deployment_branch_policy[custom_branch_policies]=true' >/dev/null
+    -F 'deployment_branch_policy[protected_branches]=false' \
+    -F 'deployment_branch_policy[custom_branch_policies]=true' >/dev/null
   gh api --method POST "repos/${OWNER}/${NAME}/environments/production/deployment-branch-policies" \
     -f name='v*' -f type='tag' >/dev/null 2>&1 || true
   ok 'preview + production environments (production gated to v* tags, spec 07)'
@@ -165,9 +166,14 @@ fi
 # ---- 9. Compile AI instruction files (athena) ------------------------------
 step '9. Compile AI instructions (athena)'
 if command -v athena >/dev/null; then
-  athena compile && git add -A && git commit -q -m 'chore: compile AI instruction files' \
-    && git push -q || fail 'athena compile/commit failed'
-  ok 'CLAUDE.md / AGENTS.md / .claude/settings.json compiled and pushed'
+  athena compile || fail 'athena compile failed'
+  if [ -n "$(git status --porcelain)" ]; then
+    git add -A && git commit -q -m 'chore: compile AI instruction files' && git push -q \
+      || fail 'committing compiled files failed'
+    ok 'CLAUDE.md / AGENTS.md / .claude/settings.json compiled and pushed'
+  else
+    ok 'compiled files already up to date — nothing to commit (idempotent)'
+  fi
 else
   printf '  \033[33m!\033[0m athena CLI not found — run `athena compile` and commit before the first PR\n'
 fi

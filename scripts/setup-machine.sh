@@ -63,7 +63,10 @@ have copier && ok "copier $(copier --version | awk '{print $NF}')"
 # ---- 5. sops -----------------------------------------------------------------
 step '5. sops'
 if ! have sops; then
-  SOPS_URL='https://github.com/getsops/sops/releases/latest/download/sops-v3.9.4.linux.amd64'
+  # Pinned release path — the `latest/download/` form 404s once a newer sops ships,
+  # because the versioned asset name no longer exists in the latest release.
+  SOPS_VERSION='3.9.4'
+  SOPS_URL="https://github.com/getsops/sops/releases/download/v${SOPS_VERSION}/sops-v${SOPS_VERSION}.linux.amd64"
   sudo curl -fsSL "$SOPS_URL" -o /usr/local/bin/sops && sudo chmod +x /usr/local/bin/sops \
     || warn 'sops install failed — download from https://github.com/getsops/sops/releases'
 fi
