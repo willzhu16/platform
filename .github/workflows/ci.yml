@@ -44,7 +44,11 @@ jobs:
         with:
           node-version: ${{ inputs.node-version }}
           cache: ${{ inputs.package-manager }}
-          cache-dependency-path: ${{ inputs.working-directory }}
+          # Must be lockfile path(s), never a directory — setup-node hashes the matched
+          # files and fails the job when the pattern resolves to no file.
+          cache-dependency-path: |
+            ${{ inputs.working-directory }}/pnpm-lock.yaml
+            ${{ inputs.working-directory }}/package-lock.json
       - name: Install
         working-directory: ${{ inputs.working-directory }}
         run: |
@@ -68,7 +72,11 @@ jobs:
         with:
           node-version: ${{ inputs.node-version }}
           cache: ${{ inputs.package-manager }}
-          cache-dependency-path: ${{ inputs.working-directory }}
+          # Must be lockfile path(s), never a directory — setup-node hashes the matched
+          # files and fails the job when the pattern resolves to no file.
+          cache-dependency-path: |
+            ${{ inputs.working-directory }}/pnpm-lock.yaml
+            ${{ inputs.working-directory }}/package-lock.json
       - name: Install
         working-directory: ${{ inputs.working-directory }}
         run: |
@@ -92,7 +100,11 @@ jobs:
         with:
           node-version: ${{ inputs.node-version }}
           cache: ${{ inputs.package-manager }}
-          cache-dependency-path: ${{ inputs.working-directory }}
+          # Must be lockfile path(s), never a directory — setup-node hashes the matched
+          # files and fails the job when the pattern resolves to no file.
+          cache-dependency-path: |
+            ${{ inputs.working-directory }}/pnpm-lock.yaml
+            ${{ inputs.working-directory }}/package-lock.json
       - name: Install
         working-directory: ${{ inputs.working-directory }}
         run: |
