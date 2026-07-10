@@ -23,13 +23,17 @@ export interface Logger {
   error(fields: LogFields): void;
 }
 
-/** Build one schema-conformant log line. Exported for testing without touching stdout. */
+/**
+ * Build one schema-conformant log line. Exported for testing without touching stdout.
+ * Schema keys win: caller fields spread first, so a stray `fields.level` can never
+ * misreport severity or shadow `ts`/`projectVersion`.
+ */
 export const formatLine = (level: LogLevel, projectVersion: string, fields: LogFields): string =>
   JSON.stringify({
+    ...fields,
     ts: new Date().toISOString(),
     level,
     projectVersion,
-    ...fields,
   });
 
 /** Create a logger bound to a release version (spec 07 tag), writing JSON lines to console. */
