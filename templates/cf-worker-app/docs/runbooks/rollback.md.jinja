@@ -12,7 +12,7 @@ Mitigate first — fixing forward is a choice, not a reflex.
 
 ```bash
 # Fastest path — roll back to the immediately previous Worker version:
-wrangler rollback --env production
+wrangler rollback
 
 # If the rollback needs a specific earlier tag (e.g. a bad migration interplay):
 gh workflow run release.yml -f tag=<previous-good-tag>
