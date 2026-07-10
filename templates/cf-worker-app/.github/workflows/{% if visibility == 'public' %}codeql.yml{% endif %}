@@ -1,0 +1,17 @@
+name: codeql
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  codeql:
+    uses: willzhu16/platform/.github/workflows/codeql.yml@v1
+    with:
+      languages: javascript-typescript

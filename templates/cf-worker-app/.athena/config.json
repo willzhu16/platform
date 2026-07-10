@@ -1,0 +1,10 @@
+{
+  "athenaVersion": "v1",
+  "stack": "ts",
+  "targets": ["workers"],
+  "tools": ["claude", "codex"],
+  "review": {
+    "enabled": false,
+    "reviewer": "claude"
+  }
+}

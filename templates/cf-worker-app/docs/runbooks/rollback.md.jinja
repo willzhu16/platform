@@ -1,0 +1,42 @@
+# Runbook: roll back {{ project_name }}
+
+Purpose: return production to the last-known-good version, fast. Target: < 5 minutes.
+Mitigate first — fixing forward is a choice, not a reflex.
+
+## Preconditions
+
+- A previous good version exists (Workers keeps prior versions server-side).
+- You have the production Cloudflare token access (via the GitHub environment, not locally).
+
+## Steps
+
+```bash
+# Fastest path — roll back to the immediately previous Worker version:
+wrangler rollback --env production
+
+# If the rollback needs a specific earlier tag (e.g. a bad migration interplay):
+gh workflow run release.yml -f tag=<previous-good-tag>
+```
+
+## Verification
+
+```bash
+curl -fsS https://<worker-url>/healthz    # expect 200 with the previous version
+```
+
+Confirm the version reverted and the error rate returns to baseline.
+
+## Data
+
+Migrations are expand → migrate → contract, so old code always runs against the new
+schema — a code rollback is always safe. Contract migrations ship at least one release
+after their expand.
+
+## After
+
+Every rollback gets a postmortem (timeline · impact · root cause · detection gap · one
+systemic fix filed as a platform/template issue).
+
+## Last tested
+
+Not yet tested — run the rollback drill once and record the date here.

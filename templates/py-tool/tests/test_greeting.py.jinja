@@ -1,0 +1,5 @@
+from {{ project_name.replace('-', '_') }} import greeting
+
+
+def test_greeting_addresses_the_caller() -> None:
+    assert greeting("world") == "Hello from {{ project_name }}, world!"

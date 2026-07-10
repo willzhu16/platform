@@ -1,0 +1,8 @@
+node_modules/
+.pnpm-store/
+dist/
+coverage/
+.wrangler/
+worker-configuration.d.ts
+.dev.vars
+.DS_Store

@@ -1,0 +1,36 @@
+# Threat model: {{ project_name }}
+
+One page, STRIDE-lite. Fill at bootstrap (~30 min); revisit when the data or auth model
+changes. Full rigor is a Phase-2 concern — a first pass beats a blank file.
+
+## What this handles
+
+{{ description }}
+
+## Data
+
+- What PII/secrets exist here, and where they live: _(fill in — default: none beyond email)_
+- Deletion path for user data: _(fill in, or "n/a — no user data")_
+
+## Trust boundaries
+
+- Public endpoints (product auth is product logic): _(list)_
+- Admin/internal surfaces (behind Cloudflare Access): _(list, or "none yet")_
+- Machine → cloud (CI deploy token, scoped to this project): production environment secret.
+
+## STRIDE-lite checklist
+
+| Threat | This project's exposure | Control |
+|---|---|---|
+| Spoofing | | Cloudflare Access on admin; Turnstile on public forms |
+| Tampering | | HTTPS everywhere; input validation at the boundary |
+| Repudiation | | structured logs with requestId |
+| Information disclosure | | secrets as bindings only; security headers shipped |
+| Denial of service | | Bot Fight Mode; rate limits on auth/expensive routes |
+| Elevation of privilege | | least-privilege tokens; no long-lived creds in CI (Phase 2 OIDC) |
+
+## Top risks (ranked)
+
+1. _(fill in — e.g. account takeover of the GitHub/Cloudflare root)_
+2.
+3.

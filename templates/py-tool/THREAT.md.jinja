@@ -1,0 +1,37 @@
+# Threat model: {{ project_name }}
+
+One page, STRIDE-lite. Fill at bootstrap (~30 min); revisit when the data or trust model
+changes. Full rigor is a Phase-2 concern — a first pass beats a blank file.
+
+## What this handles
+
+{{ description }}
+
+## Data
+
+- What PII/secrets exist here, and where they live: _(fill in — default: none; a CLI/library
+  reads its inputs from the invoking environment)_
+- Deletion path for user data: _(fill in, or "n/a — no user data")_
+
+## Trust boundaries
+
+- Inputs the tool trusts (argv, stdin, files, env vars): _(list)_
+- Third-party packages executed at runtime: pinned via `uv.lock`; scanned by `security / osv`.
+- Distribution channel (how consumers get this): _(fill in — e.g. internal only, PyPI)_
+
+## STRIDE-lite checklist
+
+| Threat | This project's exposure | Control |
+|---|---|---|
+| Spoofing | | n/a for a local tool, unless it authenticates to a service |
+| Tampering | | input validation at the boundary; typed with pyright strict |
+| Repudiation | | structured output where actions have side effects |
+| Information disclosure | | never print secrets; scrub env before logging |
+| Denial of service | | bound resource use on untrusted input (size/time limits) |
+| Elevation of privilege | | least-privilege file/network access; no shelling out to user input |
+
+## Top risks (ranked)
+
+1. _(fill in — e.g. a malicious dependency reaching runtime)_
+2.
+3.

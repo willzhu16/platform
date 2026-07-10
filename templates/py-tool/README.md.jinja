@@ -1,0 +1,26 @@
+# {{ project_name }}
+
+{{ description }}
+
+A Python CLI/library generated from the Artemis `py-tool` template. Managed with
+[uv](https://docs.astral.sh/uv/).
+
+## Develop
+
+```bash
+uv sync              # create .venv and install dev dependencies from the lockfile
+uv run {{ project_name }}   # run the console script
+```
+
+## Gates (run before pushing; CI runs them too)
+
+```bash
+uv run ruff check .        # lint
+uv run ruff format --check .  # format
+uv run pyright             # typecheck (strict)
+uv run pytest --cov        # test with coverage
+```
+
+CI runs the shared Artemis pipelines (`ci`, `security`{% if visibility == 'public' %}, `codeql`{% endif %}) on every PR via
+[ci-python.yml](https://github.com/willzhu16/platform). Behaviour is customised through
+tool config in `pyproject.toml` (ruff, pyright, pytest), never by renaming commands.

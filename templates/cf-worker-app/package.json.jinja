@@ -1,0 +1,23 @@
+{
+  "name": "{{ project_name }}",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.9.0",
+  "scripts": {
+    "dev": "wrangler dev",
+    "lint": "biome ci .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --coverage",
+    "build": "wrangler deploy --dry-run --outdir dist",
+    "cf-typegen": "wrangler types"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.2",
+    "@cloudflare/workers-types": "^4.20250101.0",
+    "@vitest/coverage-v8": "^4.1.9",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9",
+    "wrangler": "^4.0.0"
+  }
+}

@@ -1,0 +1,6 @@
+# pnpm reads build-script approvals here. These are wrangler's own toolchain deps
+# (bundler, runtime, image lib) and need their install scripts to run.
+allowBuilds:
+  esbuild: true
+  workerd: true
+  sharp: true

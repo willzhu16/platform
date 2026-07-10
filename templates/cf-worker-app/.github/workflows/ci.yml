@@ -1,0 +1,13 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  ci: # job id MUST be `ci` — it prefixes the frozen check names
+    uses: willzhu16/platform/.github/workflows/ci.yml@v1

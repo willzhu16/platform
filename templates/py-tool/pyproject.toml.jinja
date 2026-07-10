@@ -1,0 +1,38 @@
+[project]
+name = "{{ project_name }}"
+version = "0.0.0"
+description = "{{ description }}"
+requires-python = ">=3.13"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.390",
+    "pytest>=8.3.0",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.9.0",
+]
+
+[project.scripts]
+{{ project_name }} = "{{ project_name.replace('-', '_') }}:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/{{ project_name.replace('-', '_') }}"]
+
+[tool.pytest.ini_options]
+addopts = "--cov={{ project_name.replace('-', '_') }}"
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+# One fast tool per job (D-21): ruff owns lint + import-sort + format.
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pyright]
+# Strict by default (D-21); pyright over mypy for speed and inference.
+typeCheckingMode = "strict"
