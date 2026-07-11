@@ -1,17 +1,17 @@
 name: selftest
 
 # Gates changes to the reusable workflows with the workflows themselves (spec 01 §6.4).
-# On any platform PR that touches a reusable CI workflow or a fixture, run ci.yml and
-# ci-python.yml against their minimal fixtures via LOCAL references. If a required check
-# name is renamed, or the pipeline breaks, this goes red — the interface-freeze tripwire
-# (acceptance test 6). The fixtures double as the living example of the script contract.
+# On any platform PR that touches a workflow or a fixture: lint EVERY workflow with
+# actionlint (so a new reusable workflow can never ship ungated — release.yml and
+# preview.yml once did), and run ci.yml / ci-python.yml against their minimal fixtures
+# via LOCAL references. If a required check name is renamed, or the pipeline breaks,
+# this goes red — the interface-freeze tripwire (acceptance test 6). The fixtures double
+# as the living example of the script contract.
 
 on:
   pull_request:
     paths:
-      - '.github/workflows/ci.yml'
-      - '.github/workflows/ci-python.yml'
-      - '.github/workflows/selftest.yml'
+      - '.github/workflows/**'
       - 'selftest-fixture/**'
       - 'selftest-fixture-py/**'
 
@@ -19,6 +19,18 @@ permissions:
   contents: read
 
 jobs:
+  lint-workflows:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: actionlint (syntax + expression + shellcheck for all workflows)
+        uses: docker://rhysd/actionlint:1.7.7
+        with:
+          # -ignore: `job.workflow_repository` is a real context (security.yml relies
+          # on it and its checks pass in CI) that actionlint 1.7.7 doesn't know yet.
+          args: -color -ignore 'property "workflow_repository" is not defined'
+
   ci:
     uses: ./.github/workflows/ci.yml
     with:
