@@ -12,6 +12,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: write # the handover step dispatches release.yml
 
 jobs:
   release-please:
@@ -19,6 +20,18 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: googleapis/release-please-action@v4
+        id: release
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+      - name: Hand over to release.yml
+        # Tags created with the workflow's GITHUB_TOKEN never fire `on: push: tags`
+        # runs (GitHub suppresses GITHUB_TOKEN-created events — workflow_dispatch is
+        # the documented exception), so hand over explicitly. Dispatching ON the tag
+        # ref also satisfies the production environment's v*-tags-only policy.
+        if: ${{ steps.release.outputs.release_created == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.release.outputs.tag_name }}
+        run: gh workflow run release.yml --ref "$TAG" -f "tag=$TAG"

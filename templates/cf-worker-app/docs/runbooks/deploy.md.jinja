@@ -14,8 +14,9 @@ runs in production is a tagged artifact, never a branch tip.
 
 ```bash
 # Releases are tag-driven: merging the release PR tags vX.Y.Z and release.yml deploys.
-# To deploy manually from a tag (rare):
-gh workflow run release.yml -f tag=vX.Y.Z
+# To deploy manually from a tag (rare) — dispatch ON the tag ref; the production
+# environment only allows v* tag refs, so a run from main would be rejected:
+gh workflow run release.yml --ref vX.Y.Z -f tag=vX.Y.Z
 ```
 
 ## Verification
