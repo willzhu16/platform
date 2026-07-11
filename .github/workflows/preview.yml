@@ -1,0 +1,83 @@
+name: preview-reusable
+
+# Reusable per-PR preview deploy (spec 07 §2.1; D-06: local → preview → production, no
+# staging). Callers name their job `preview`, so the check surfaces as
+# `preview / deploy` — required in rulesets only for repos that deploy. Uploads a
+# preview version of the Worker (`wrangler versions upload` — the identical runtime as
+# production) and maintains ONE sticky PR comment with the preview URL; pushing new
+# commits updates that comment, never adds another.
+#
+# Secrets: the job runs in the CALLER's `preview` environment; callers use
+# `secrets: inherit` so the environment-scoped CLOUDFLARE_API_TOKEN resolves there.
+#
+# Caveat: `versions upload` needs the Worker to exist — the first production deploy
+# (or a manual `wrangler deploy`) creates it; preview runs before that fail.
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        type: string
+        default: '.'
+      node-version:
+        type: string
+        default: '24'
+
+permissions:
+  contents: read
+  pull-requests: write # the sticky preview-URL comment
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: preview
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          # Resolve the pnpm version from the project's packageManager field — the
+          # default looks at the caller repo root, which may have no package.json.
+          package_json_file: ${{ inputs.working-directory }}/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: pnpm
+          cache-dependency-path: ${{ inputs.working-directory }}/pnpm-lock.yaml
+      - name: Install
+        working-directory: ${{ inputs.working-directory }}
+        run: pnpm install --frozen-lockfile
+      - name: Upload preview version
+        id: preview
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          pnpm exec wrangler versions upload \
+            --message "PR #${{ github.event.pull_request.number }}" | tee upload.log
+          url="$(grep -Eo 'https://[a-zA-Z0-9-]+[^ ]*\.workers\.dev' upload.log | head -1)"
+          if [ -z "$url" ]; then
+            echo "::error::no preview URL found in wrangler versions upload output"
+            exit 1
+          fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+      - name: Update the sticky preview comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          marker='<!-- artemis-preview-url -->'
+          pr='${{ github.event.pull_request.number }}'
+          repo='${{ github.repository }}'
+          body="$(printf '%s\n**Preview**: %s (for %s)' \
+            "$marker" '${{ steps.preview.outputs.url }}' '${{ github.event.pull_request.head.sha }}')"
+          comment_id="$(gh api "repos/${repo}/issues/${pr}/comments" --paginate \
+            --jq ".[] | select(.body | startswith(\"${marker}\")) | .id" | head -1)"
+          if [ -n "$comment_id" ]; then
+            gh api -X PATCH "repos/${repo}/issues/comments/${comment_id}" -f body="$body" >/dev/null
+          else
+            gh api -X POST "repos/${repo}/issues/${pr}/comments" -f body="$body" >/dev/null
+          fi

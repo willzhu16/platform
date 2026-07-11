@@ -123,13 +123,13 @@ jobs:
         run: pip install "semgrep==${SEMGREP_VERSION}"
       - name: Scan
         run: |
-          extra=""
+          extra=()
           if [ -n "${{ inputs.semgrep-config }}" ]; then
-            extra="--config ${{ inputs.semgrep-config }}"
+            extra=(--config '${{ inputs.semgrep-config }}')
           fi
           semgrep scan \
             --config .artemis-platform/security/semgrep \
-            $extra \
+            "${extra[@]}" \
             --error --metrics=off --no-git-ignore \
             --exclude .artemis-platform
 
