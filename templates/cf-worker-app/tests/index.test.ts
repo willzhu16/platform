@@ -16,4 +16,13 @@ describe('formatLine', () => {
     expect(parsed).toMatchObject({ level: 'info', projectVersion: 'v1.0.0', event: 'test_event' });
     expect(typeof parsed.ts).toBe('string');
   });
+
+  it('never lets caller fields shadow the schema keys', () => {
+    // Regression: fields used to spread last, so a stray `level` misreported severity.
+    const parsed = JSON.parse(
+      formatLine('info', 'v1.0.0', { event: 'test_event', level: 'error', projectVersion: 'v9' }),
+    );
+    expect(parsed.level).toBe('info');
+    expect(parsed.projectVersion).toBe('v1.0.0');
+  });
 });
