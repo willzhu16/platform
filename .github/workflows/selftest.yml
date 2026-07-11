@@ -25,11 +25,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: actionlint (syntax + expression + shellcheck for all workflows)
+        # False-positive suppressions live in .github/actionlint.yml — the docker
+        # action splits `args` on whitespace, so quoted -ignore patterns can't be
+        # passed here.
         uses: docker://rhysd/actionlint:1.7.7
         with:
-          # -ignore: `job.workflow_repository` is a real context (security.yml relies
-          # on it and its checks pass in CI) that actionlint 1.7.7 doesn't know yet.
-          args: -color -ignore 'property "workflow_repository" is not defined'
+          args: -color
 
   ci:
     uses: ./.github/workflows/ci.yml
