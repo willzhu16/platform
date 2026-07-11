@@ -1,0 +1,7 @@
+# Config for the selftest lint-workflows job.
+paths:
+  .github/workflows/security.yml:
+    ignore:
+      # False positive: job.workflow_repository is a real context (security.yml relies
+      # on it and its checks pass in CI); actionlint 1.7.7 doesn't know it yet.
+      - 'property "workflow_repository" is not defined'

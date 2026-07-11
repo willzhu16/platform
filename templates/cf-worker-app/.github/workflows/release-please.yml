@@ -1,0 +1,37 @@
+name: release-please
+
+# release-please for this project (spec 07 §2.3, D-14). On every push to main it
+# maintains a running "chore: release vX.Y.Z" PR from Conventional Commits. Merging
+# that PR is the human release decision — never merged by an agent — and tags vX.Y.Z,
+# cuts a GitHub Release with a changelog, and hands over to release.yml.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write # the handover step dispatches release.yml
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+      - name: Hand over to release.yml
+        # Tags created with the workflow's GITHUB_TOKEN never fire `on: push: tags`
+        # runs (GitHub suppresses GITHUB_TOKEN-created events — workflow_dispatch is
+        # the documented exception), so hand over explicitly. Dispatching ON the tag
+        # ref also satisfies the production environment's v*-tags-only policy.
+        if: ${{ steps.release.outputs.release_created == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.release.outputs.tag_name }}
+        run: gh workflow run release.yml --ref "$TAG" -f "tag=$TAG"
