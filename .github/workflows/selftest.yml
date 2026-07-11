@@ -1,12 +1,13 @@
 name: selftest
 
 # Gates changes to the reusable workflows with the workflows themselves (spec 01 §6.4).
-# On any platform PR that touches a workflow or a fixture: lint EVERY workflow with
-# actionlint (so a new reusable workflow can never ship ungated — release.yml and
-# preview.yml once did), and run ci.yml / ci-python.yml against their minimal fixtures
-# via LOCAL references. If a required check name is renamed, or the pipeline breaks,
-# this goes red — the interface-freeze tripwire (acceptance test 6). The fixtures double
-# as the living example of the script contract.
+# On any platform PR that touches a workflow, a template, or a fixture: lint EVERY
+# workflow with actionlint (so a new reusable workflow can never ship ungated —
+# release.yml and preview.yml once did), run ci.yml / ci-python.yml against their
+# minimal fixtures via LOCAL references, and render both copier templates and run the
+# rendered projects' own gates (the fixtures do NOT cover templates). If a required
+# check name is renamed, or the pipeline breaks, this goes red — the interface-freeze
+# tripwire (acceptance test 6).
 
 on:
   pull_request:
@@ -14,6 +15,8 @@ on:
       - '.github/workflows/**'
       - 'selftest-fixture/**'
       - 'selftest-fixture-py/**'
+      - 'templates/**'
+      - 'copier.yml'
 
 permissions:
   contents: read
@@ -43,3 +46,73 @@ jobs:
     with:
       working-directory: selftest-fixture-py
       enforce-conventional-commits: false
+
+  # Render each template with every feature ON and run the rendered project's own
+  # gates. This is what catches a template bug (bad jinja, broken wrangler config,
+  # failing generated test) before a real project is generated from it.
+  render-cf-worker-app:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # copier renders from the git HEAD, not the working tree
+      - uses: astral-sh/setup-uv@v6
+      - name: Render the template (all features on)
+        run: |
+          cat > "$RUNNER_TEMP/answers.yml" <<'EOF'
+          template: cf-worker-app
+          project_name: render-check
+          description: selftest render of cf-worker-app
+          visibility: public
+          bindings: [kv, d1, r2, queues]
+          needs_scheduled_jobs: true
+          public_forms: true
+          EOF
+          uvx --from copier copier copy --defaults --vcs-ref HEAD \
+            --data-file "$RUNNER_TEMP/answers.yml" . render-out
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: render-out/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run the rendered project's gates
+        working-directory: render-out
+        # No lockfile ships in the template (new-project.sh generates it), so this
+        # install is deliberately un-frozen. `pnpm build` is wrangler's dry-run
+        # deploy — it validates the rendered wrangler.jsonc and bundles the Worker.
+        run: |
+          pnpm install
+          pnpm typecheck
+          pnpm test
+          pnpm build
+
+  render-py-tool:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # copier renders from the git HEAD, not the working tree
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.13'
+      - name: Render the template
+        run: |
+          cat > "$RUNNER_TEMP/answers.yml" <<'EOF'
+          template: py-tool
+          project_name: render-check-py
+          description: selftest render of py-tool
+          visibility: public
+          EOF
+          uvx --from copier copier copy --defaults --vcs-ref HEAD \
+            --data-file "$RUNNER_TEMP/answers.yml" . render-out
+      - name: Run the rendered project's gates
+        working-directory: render-out
+        run: |
+          uv sync
+          uv run ruff check .
+          uv run ruff format --check .
+          uv run pyright
+          uv run pytest -q
