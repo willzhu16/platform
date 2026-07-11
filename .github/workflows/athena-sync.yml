@@ -1,0 +1,83 @@
+name: athena-sync-reusable
+
+# Weekly instruction-drift sync (spec 04 §3). Recompiles the caller repo's agent
+# instruction files (CLAUDE.md / AGENTS.md / .claude/settings.json) against athena at
+# the pinned ref and opens ONE PR with the diff when they differ — instruction updates
+# arrive as reviewable diffs, exactly like Renovate. Re-runs force-push the same
+# branch, so there is never more than one open sync PR. Callers name their job `sync`.
+#
+# doctor runs after the recompile as verification: if the freshly compiled repo still
+# fails doctor, something is wrong with the repo's .athena config and the run goes red.
+#
+# Caveat: the sync PR is created with GITHUB_TOKEN, and GitHub does not run workflows
+# on events that token creates — so the PR's CI checks stay pending until a human
+# closes and reopens it (or pushes to the branch). The PR body says this.
+
+on:
+  workflow_call:
+    inputs:
+      athena-ref:
+        type: string
+        default: 'v1' # the moving athena major tag (D-18)
+      node-version:
+        type: string
+        default: '24'
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/athena
+          ref: ${{ inputs.athena-ref }}
+          path: .athena-src
+      - uses: pnpm/action-setup@v4
+        with:
+          # Resolve the pnpm version from athena's packageManager field — the caller
+          # repo may not even be a Node project (py-tool).
+          package_json_file: .athena-src/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: pnpm
+          cache-dependency-path: .athena-src/pnpm-lock.yaml
+      - name: Install athena
+        working-directory: .athena-src
+        run: pnpm install --frozen-lockfile
+      - name: Recompile instruction files against athena
+        working-directory: .athena-src
+        run: pnpm compile "$GITHUB_WORKSPACE"
+      - name: Verify the recompiled repo passes doctor
+        working-directory: .athena-src
+        run: pnpm doctor "$GITHUB_WORKSPACE"
+      - name: Open or update the sync PR on drift
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ATHENA_REF: ${{ inputs.athena-ref }}
+        run: |
+          rm -rf .athena-src
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "no drift — instruction files are current"
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B chore/athena-sync
+          git add -A
+          git commit -m "chore: sync agent instructions from athena@${ATHENA_REF}"
+          git push -f origin chore/athena-sync
+          if [ -z "$(gh pr list --head chore/athena-sync --state open --json number --jq '.[].number')" ]; then
+            gh pr create \
+              --title 'chore: sync agent instructions from athena' \
+              --body "$(printf '%s\n\n%s\n%s' \
+                "Weekly athena sync: the compiled instruction files drifted from athena@${ATHENA_REF} — either athena's layers changed, or a file was hand-edited (never do that; edit .athena/project.md instead). Review the diff and merge to converge." \
+                '> [!NOTE]' \
+                '> CI will not start on this PR automatically (it was opened by GITHUB_TOKEN, which cannot trigger workflows). Close and reopen the PR to run the checks.')"
+          fi
