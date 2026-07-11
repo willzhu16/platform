@@ -50,6 +50,7 @@ needs_scheduled_jobs:
   type: bool
   help: Does this project run scheduled (cron) jobs? Adds a cron trigger + heartbeat stub.
   default: false
+  when: "{{ template == 'cf-worker-app' }}"
 
 public_forms:
   type: bool

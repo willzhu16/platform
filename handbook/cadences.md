@@ -3,6 +3,7 @@
 The recurring maintenance that keeps the system from decaying. Implemented as scheduled
 GitHub issues opened by [`platform/.github/workflows/cadence.yml`](../.github/workflows/cadence.yml)
 — each issue body is its checklist below, so the ritual is unskippable, not remembered.
+The workflow embeds a copy of these checklists (`CHECKLISTS`); edit both together.
 
 ## Weekly (Mondays)
 
