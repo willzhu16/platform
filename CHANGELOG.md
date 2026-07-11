@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.3.0](https://github.com/willzhu16/platform/compare/v1.2.0...v1.3.0) (2026-07-11)
+
+
+### Features
+
+* add the athena-sync reusable workflow (spec 04 §3) ([737e9a8](https://github.com/willzhu16/platform/commit/737e9a80e3c5695cae162beb0f8814da4f5b1f75))
+* athena-sync workflow and template-render selftest ([724c08b](https://github.com/willzhu16/platform/commit/724c08bf485bb09cebe242353f00abab272bbd16))
+* **ci:** render both templates in selftest and run their gates ([deb49cc](https://github.com/willzhu16/platform/commit/deb49cc94bd07403cf759fd690b49ef4aaf001e2))
+
 ## [1.2.0](https://github.com/willzhu16/platform/compare/v1.1.0...v1.2.0) (2026-07-11)
 
 
