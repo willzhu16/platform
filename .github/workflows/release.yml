@@ -9,7 +9,10 @@ name: release-reusable
 #
 # Callers trigger on `push: tags: v*` and also expose `workflow_dispatch` with a `tag`
 # input forwarded here, so the rollback runbook's
-# `gh workflow run release.yml -f tag=vX.Y.Z` redeploys an exact earlier version.
+# `gh workflow run release.yml --ref vX.Y.Z -f tag=vX.Y.Z` redeploys an exact earlier
+# version. Dispatch ON THE TAG REF: the production environment only admits v* tag refs,
+# and release-please's GITHUB_TOKEN tags never fire `push: tags` on their own, so the
+# template's release-please.yml dispatches this workflow the same way.
 #
 # Secrets: the deploy job runs in the CALLER's `production` environment (tag-gated by
 # new-project bootstrap, spec 03 §5.6); callers use `secrets: inherit` so the
@@ -31,6 +34,9 @@ on:
       deploy:
         type: boolean
         default: false # cf-worker-app passes true; artifact-only projects keep false
+      deploy-entry:
+        type: string
+        default: 'dist/index.js' # the built bundle `deploy: true` callers ship
       publish-command:
         type: string
         default: '' # extension point: runs after the artifact upload when non-empty
@@ -61,13 +67,17 @@ jobs:
       - name: Resolve release tag
         id: tag
         # Guard the shape so a workflow_dispatch typo can never build or deploy from
-        # a branch name — only plain vX.Y.Z tags exist here (D-18).
+        # a branch name — only plain vX.Y.Z tags exist here (D-18). The raw value goes
+        # through env, never into the script text: tag names and dispatch inputs may
+        # contain shell metacharacters, and interpolating them would execute before
+        # this guard can reject them.
+        env:
+          RAW_TAG: ${{ inputs.tag != '' && inputs.tag || github.ref_name }}
         run: |
-          tag="${{ inputs.tag != '' && inputs.tag || github.ref_name }}"
-          if echo "$tag" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if echo "$RAW_TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "tag=$RAW_TAG" >> "$GITHUB_OUTPUT"
           else
-            echo "::error::'$tag' is not a vX.Y.Z release tag"
+            echo "::error::'$RAW_TAG' is not a vX.Y.Z release tag"
             exit 1
           fi
       - uses: actions/checkout@v4
@@ -111,11 +121,15 @@ jobs:
           for lockfile in pnpm-lock.yaml uv.lock; do
             [ -f "$lockfile" ] && hash_targets="$hash_targets $lockfile"
           done
+          # A marker line makes this idempotent: a re-run (rollback redeploys always
+          # rebuild) replaces the hash block instead of appending a duplicate.
+          marker='<!-- artemis-release-hashes -->'
           {
-            gh release view "$tag" --json body --jq '.body // ""'
-            echo
+            gh release view "$tag" --json body --jq '.body // ""' \
+              | awk -v marker="$marker" '$0 == marker { exit } { print }'
+            echo "$marker"
             echo '```'
-            # shellcheck disable=SC2086 — word-splitting the file list is intended
+            # shellcheck disable=SC2086 # word-splitting the file list is intended
             sha256sum $hash_targets
             echo '```'
           } > "$RUNNER_TEMP/release-notes.md"
@@ -162,5 +176,5 @@ jobs:
         run: |
           # Deploy exactly what `build` produced (build-once): the bundled entry
           # point, no re-bundling. PROJECT_VERSION pins /healthz to the tag.
-          pnpm exec wrangler deploy dist/index.js --no-bundle \
+          pnpm exec wrangler deploy "${{ inputs.deploy-entry }}" --no-bundle \
             --var "PROJECT_VERSION:${{ needs.build.outputs.tag }}"
