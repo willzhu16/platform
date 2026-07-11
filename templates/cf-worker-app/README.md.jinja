@@ -1,0 +1,33 @@
+# {{ project_name }}
+
+{{ description }}
+
+A Cloudflare Worker generated from the Artemis `cf-worker-app` template.
+
+## Develop
+
+```bash
+pnpm install
+pnpm dev          # wrangler dev — serves http://localhost:8787
+```
+
+- `GET /` — hello route
+- `GET /healthz` — liveness probe: `200 {"version": "<tag>"}`
+
+## Gates (run before pushing; CI runs them too)
+
+```bash
+pnpm lint         # biome ci .
+pnpm typecheck    # tsc --noEmit
+pnpm test         # vitest run --coverage
+pnpm build        # wrangler dry-run build
+```
+
+CI runs the shared Artemis pipelines (`ci`, `security`{% if visibility == 'public' %}, `codeql`{% endif %}) on every PR. See
+[docs/runbooks/deploy.md](docs/runbooks/deploy.md) and
+[docs/runbooks/rollback.md](docs/runbooks/rollback.md) for operations.
+
+## Deploy
+
+Production deploys are tag-driven and human-approved (never by an agent). Preview deploys
+run per-PR. See the deploy runbook.

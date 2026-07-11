@@ -1,0 +1,33 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "{{ project_name }}",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-06-01",
+  "observability": {
+    "enabled": true
+  },
+{%- if 'kv' in bindings %}
+  "kv_namespaces": [{ "binding": "KV", "id": "REPLACE_WITH_KV_ID" }],
+{%- endif %}
+{%- if 'd1' in bindings %}
+  "d1_databases": [
+    { "binding": "DB", "database_name": "{{ project_name }}", "database_id": "REPLACE_WITH_D1_ID" }
+  ],
+{%- endif %}
+{%- if 'r2' in bindings %}
+  "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "{{ project_name }}" }],
+{%- endif %}
+{%- if 'queues' in bindings %}
+  "queues": {
+    "producers": [{ "binding": "QUEUE", "queue": "{{ project_name }}" }]
+  },
+{%- endif %}
+{%- if needs_scheduled_jobs %}
+  "triggers": {
+    "crons": ["0 * * * *"]
+  },
+{%- endif %}
+  "vars": {
+    "PROJECT_VERSION": "dev"
+  }
+}

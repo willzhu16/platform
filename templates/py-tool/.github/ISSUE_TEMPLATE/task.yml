@@ -1,0 +1,40 @@
+name: Task packet
+description: A reviewable unit of agent work (athena spec 04)
+labels: [task]
+body:
+  - type: input
+    id: goal
+    attributes:
+      label: Goal
+      description: One sentence, outcome not activity.
+    validations:
+      required: true
+  - type: textarea
+    id: non-goals
+    attributes:
+      label: Non-goals
+      description: Files/behaviours the agent must NOT touch. At least one entry — an empty field means the packet is not ready.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Observable checks; each maps to a test or a documented manual check.
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints
+      description: Applicable ADRs/DECISIONS by ID; performance/security notes.
+  - type: textarea
+    id: pointers
+    attributes:
+      label: Pointers
+      description: Paths and links only — never pasted file contents.
+  - type: input
+    id: done
+    attributes:
+      label: Done means
+      value: All checks in spec 01/02 green + every acceptance criterion demonstrated.

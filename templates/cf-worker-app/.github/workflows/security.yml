@@ -1,0 +1,18 @@
+name: security
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# One live run per branch: a superseded push cancels the previous run's jobs.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  security: # job id MUST be `security` — check-name contract
+    uses: willzhu16/platform/.github/workflows/security.yml@v1

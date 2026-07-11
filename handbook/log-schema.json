@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/willzhu16/platform/handbook/log-schema.json",
+  "title": "Artemis structured log line",
+  "description": "One JSON object per line (JSONL). Frozen contract; mirrors handbook/log-schema.md and the templates' src/lib/log.ts (spec 03).",
+  "type": "object",
+  "required": ["ts", "level", "event", "projectVersion"],
+  "additionalProperties": true,
+  "properties": {
+    "ts": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$",
+      "description": "ISO 8601 timestamp in UTC (as Date.prototype.toISOString emits). The pattern enforces UTC (trailing Z) even when the validator does not assert the date-time format."
+    },
+    "level": {
+      "type": "string",
+      "enum": ["debug", "info", "warn", "error"]
+    },
+    "event": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(_[a-z0-9]+)*$",
+      "description": "snake_case verb phrase; the primary query key."
+    },
+    "projectVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "requestId": { "type": "string" },
+    "route": { "type": "string" },
+    "durationMs": { "type": "number" },
+    "userId": {
+      "type": "string",
+      "description": "Opaque id only; never PII."
+    },
+    "err": {
+      "type": "object",
+      "required": ["message"],
+      "additionalProperties": true,
+      "properties": {
+        "message": { "type": "string" },
+        "stack": { "type": "string" },
+        "code": { "type": "string" }
+      }
+    }
+  }
+}

@@ -1,0 +1,15 @@
+"""{{ project_name }} — {{ description }}
+
+Generated from the Artemis `py-tool` template. The `main` entry point is wired to the
+`{{ project_name }}` console script in pyproject.toml.
+"""
+
+
+def greeting(name: str) -> str:
+    """Return the tool's greeting. Pure and exported so tests need no I/O."""
+    return f"Hello from {{ project_name }}, {name}!"
+
+
+def main() -> None:
+    """Console-script entry point."""
+    print(greeting("world"))

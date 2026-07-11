@@ -1,0 +1,59 @@
+# Artemis project templates (spec 03). One frozen question set; the `template` answer
+# selects which subdirectory under templates/ is rendered. new-project.sh drives this
+# non-interactively with --data; a human can also run `copier copy` interactively.
+
+_subdirectory: "templates/{{ template }}"
+_templates_suffix: .jinja
+_answers_file: .copier-answers.yml
+_min_copier_version: '9.0.0'
+
+template:
+  type: str
+  help: Which template to generate
+  choices:
+    - cf-worker-app
+    - py-tool
+  default: cf-worker-app
+
+project_name:
+  type: str
+  help: Project name (slug — lowercase letters, digits, hyphens)
+  validator: >-
+    {% if not (project_name | regex_search('^[a-z][a-z0-9-]*$')) %}
+    project_name must be a lowercase slug (e.g. my-worker){% endif %}
+
+description:
+  type: str
+  help: One-line description of the project
+
+visibility:
+  type: str
+  help: Repository visibility
+  choices:
+    - public
+    - private
+  default: public
+
+bindings:
+  type: str
+  help: Cloudflare bindings to wire up
+  multiselect: true
+  choices:
+    - kv
+    - d1
+    - r2
+    - queues
+  default: []
+  when: "{{ template == 'cf-worker-app' }}"
+
+needs_scheduled_jobs:
+  type: bool
+  help: Does this project run scheduled (cron) jobs? Adds a cron trigger + heartbeat stub.
+  default: false
+  when: "{{ template == 'cf-worker-app' }}"
+
+public_forms:
+  type: bool
+  help: Does this project serve public forms? Adds a Turnstile widget + verify helper.
+  default: false
+  when: "{{ template == 'cf-worker-app' }}"

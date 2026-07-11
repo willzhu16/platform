@@ -1,0 +1,14 @@
+name: athena-sync
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    uses: willzhu16/platform/.github/workflows/athena-sync.yml@v1

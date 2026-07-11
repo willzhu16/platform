@@ -1,0 +1,24 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", ":semanticCommits"],
+  "schedule": ["before 06:00 on monday"],
+  "prConcurrentLimit": 5,
+  "labels": ["dependencies"],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 06:00 on monday"]
+  },
+  "packageRules": [
+    {
+      "description": "Batch minor/patch/pin/digest updates into one weekly PR (D-11 grouping value).",
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "groupName": "non-major dependencies"
+    },
+    {
+      "description": "Surface platform reusable-workflow major bumps on their own PR (D-18 migration = one line).",
+      "matchManagers": ["github-actions"],
+      "matchDepNames": ["willzhu16/platform"],
+      "groupName": "artemis platform"
+    }
+  ]
+}

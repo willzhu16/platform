@@ -27,6 +27,10 @@ jobs:
       - name: Fetch shared gitleaks config from platform
         uses: actions/checkout@v4
         with:
+          # Hardcoded on purpose: this file is COPIED into a legacy repo and dispatched
+          # there, so every context-derived location (github.workflow_ref, job.workflow_*)
+          # would name the legacy repo itself — which has no gitleaks config. Platform's
+          # default branch is right for a one-shot onboarding scan.
           repository: ${{ github.repository_owner }}/platform
           sparse-checkout: security/gitleaks.toml
           sparse-checkout-cone-mode: false

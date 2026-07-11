@@ -1,0 +1,94 @@
+name: cadence
+
+# Opens the recurring-maintenance issues from handbook/cadences.md on schedule (spec 05
+# §2.5) — each issue body IS its checklist, so the ritual is unskippable rather than
+# remembered. One cron per cadence; GitHub fires a separate event per matching cron, so
+# a date that is both "Monday" and "the 1st" correctly opens both issues.
+#
+# Test without waiting for a cron: Actions → cadence → Run workflow → pick a cadence
+# (acceptance test 2). Re-running the same period is a no-op (it dedupes on title).
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'          # weekly    — Mondays 06:00 UTC
+    - cron: '0 6 1 * *'          # monthly   — the 1st, 06:00 UTC
+    - cron: '0 6 1 1,4,7,10 *'   # quarterly — 1st of Jan/Apr/Jul/Oct, 06:00 UTC
+  workflow_dispatch:
+    inputs:
+      cadence:
+        description: Which cadence issue to open (manual test)
+        type: choice
+        options: [weekly, monthly, quarterly]
+        default: weekly
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  open-issue:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Open the cadence issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const CRON_TO_CADENCE = {
+              '0 6 * * 1': 'weekly',
+              '0 6 1 * *': 'monthly',
+              '0 6 1 1,4,7,10 *': 'quarterly',
+            };
+            const cadence = context.eventName === 'workflow_dispatch'
+              ? context.payload.inputs.cadence
+              : CRON_TO_CADENCE[context.payload.schedule];
+            if (!cadence) {
+              core.setFailed(`unrecognized schedule: ${context.payload.schedule}`);
+              return;
+            }
+
+            // Mirror of handbook/cadences.md — that file is the canonical wording; any
+            // edit there must be copied here (and vice versa) until the checklist is
+            // parsed from the handbook at runtime.
+            const CHECKLISTS = {
+              weekly: [
+                'Review the **SEV3 digest** — anything recurring becomes a systemic fix (an issue).',
+                'Merge the **Renovate batch** (the grouped non-major PR), once its checks are green.',
+              ],
+              monthly: [
+                '**`copier update` sweep** — pull template fixes into every active repo as diffs.',
+                '**Semgrep rules + vendored actions review** — bump the vendored copies via PR.',
+                '**Expired osv-ignores** — grep for lapsed suppression dates; re-triage or remove.',
+                "**Session-log harvest** — read the month's agent session logs; convert recurring " +
+                  'mistakes into a lint/CI rule (preferred, deterministic) or an instruction line ' +
+                  '(fallback). This is the athena flywheel (ARCHITECTURE §6.0 rule 5) made a ritual.',
+              ],
+              quarterly: [
+                '**Token rotation + access review** — walk the spec 06 secrets inventory.',
+                '**Restore test** — actually restore from backup (spec 08); an untested backup ' +
+                  'is a guess.',
+                '**Stale sweep** — remove feature flags past 100% rollout and stale branches.',
+              ],
+            };
+
+            const today = new Date().toISOString().slice(0, 10);
+            const title = `Cadence: ${cadence} — ${today}`;
+            const body = [
+              `Recurring **${cadence}** maintenance (handbook/cadences.md). Check each item, then close.`,
+              '',
+              ...CHECKLISTS[cadence].map((item) => `- [ ] ${item}`),
+            ].join('\n');
+
+            const { owner, repo } = context.repo;
+            const existing = await github.rest.issues.listForRepo({
+              owner, repo, state: 'open', labels: 'cadence', per_page: 100,
+            });
+            if (existing.data.some((issue) => issue.title === title)) {
+              core.info(`"${title}" already open — skipping (idempotent).`);
+              return;
+            }
+
+            const { data } = await github.rest.issues.create({
+              owner, repo, title, body, labels: ['cadence', cadence],
+            });
+            core.info(`opened #${data.number}: ${title}`);

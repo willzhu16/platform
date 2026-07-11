@@ -40,11 +40,19 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         if: inputs.package-manager == 'pnpm'
+        with:
+          # Resolve the pnpm version from the project's packageManager field — the
+          # default looks at the CALLER repo root, which may have no package.json.
+          package_json_file: ${{ inputs.working-directory }}/package.json
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node-version }}
           cache: ${{ inputs.package-manager }}
-          cache-dependency-path: ${{ inputs.working-directory }}
+          # Must be lockfile path(s), never a directory — setup-node hashes the matched
+          # files and fails the job when the pattern resolves to no file.
+          cache-dependency-path: |
+            ${{ inputs.working-directory }}/pnpm-lock.yaml
+            ${{ inputs.working-directory }}/package-lock.json
       - name: Install
         working-directory: ${{ inputs.working-directory }}
         run: |
@@ -64,11 +72,19 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         if: inputs.package-manager == 'pnpm'
+        with:
+          # Resolve the pnpm version from the project's packageManager field — the
+          # default looks at the CALLER repo root, which may have no package.json.
+          package_json_file: ${{ inputs.working-directory }}/package.json
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node-version }}
           cache: ${{ inputs.package-manager }}
-          cache-dependency-path: ${{ inputs.working-directory }}
+          # Must be lockfile path(s), never a directory — setup-node hashes the matched
+          # files and fails the job when the pattern resolves to no file.
+          cache-dependency-path: |
+            ${{ inputs.working-directory }}/pnpm-lock.yaml
+            ${{ inputs.working-directory }}/package-lock.json
       - name: Install
         working-directory: ${{ inputs.working-directory }}
         run: |
@@ -88,11 +104,19 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         if: inputs.package-manager == 'pnpm'
+        with:
+          # Resolve the pnpm version from the project's packageManager field — the
+          # default looks at the CALLER repo root, which may have no package.json.
+          package_json_file: ${{ inputs.working-directory }}/package.json
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node-version }}
           cache: ${{ inputs.package-manager }}
-          cache-dependency-path: ${{ inputs.working-directory }}
+          # Must be lockfile path(s), never a directory — setup-node hashes the matched
+          # files and fails the job when the pattern resolves to no file.
+          cache-dependency-path: |
+            ${{ inputs.working-directory }}/pnpm-lock.yaml
+            ${{ inputs.working-directory }}/package-lock.json
       - name: Install
         working-directory: ${{ inputs.working-directory }}
         run: |

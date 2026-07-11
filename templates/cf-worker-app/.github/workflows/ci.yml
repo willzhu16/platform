@@ -1,0 +1,18 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# One live run per branch: a superseded push cancels the previous run's jobs.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ci: # job id MUST be `ci` — it prefixes the frozen check names
+    uses: willzhu16/platform/.github/workflows/ci.yml@v1
