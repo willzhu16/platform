@@ -72,8 +72,8 @@ else
     echo "project_name: ${NAME}"
     echo "description: ${DESCRIPTION}"
     echo "visibility: ${VISIBILITY}"
-    echo "needs_scheduled_jobs: ${SCHEDULED}"
     if [ "$TEMPLATE" = 'cf-worker-app' ]; then
+      echo "needs_scheduled_jobs: ${SCHEDULED}"
       echo "public_forms: ${PUBLIC_FORMS}"
       echo -n 'bindings: ['
       echo -n "$(echo "$BINDINGS" | tr ',' '\n' | sed '/^$/d' | sed 's/.*/"&"/' | paste -sd, -)"
