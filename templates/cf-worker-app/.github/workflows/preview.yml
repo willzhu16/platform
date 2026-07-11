@@ -2,6 +2,14 @@ name: preview
 
 on:
   pull_request:
+    # The defaults plus ready_for_review, so a PR leaving draft gets its preview
+    # immediately instead of waiting for the next push.
+    types: [opened, synchronize, reopened, ready_for_review]
+
+# Only the newest push per PR deploys — superseded preview runs are cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -9,5 +17,7 @@ permissions:
 
 jobs:
   preview:
+    # Draft PRs skip the deploy; nobody visits a preview URL for a draft.
+    if: ${{ github.event.pull_request.draft == false }}
     uses: willzhu16/platform/.github/workflows/preview.yml@v1
     secrets: inherit
