@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.4.0](https://github.com/willzhu16/platform/compare/v1.3.0...v1.4.0) (2026-07-12)
+
+
+### Features
+
+* **ci:** shellcheck the bootstrap scripts in selftest ([61e8e27](https://github.com/willzhu16/platform/commit/61e8e27b2a3946ceabbd03f16dc645b6bc077744))
+
+
+### Bug Fixes
+
+* **scripts:** close the bootstrap gaps found by the canary drill ([42682e7](https://github.com/willzhu16/platform/commit/42682e7a6c0da7dc170e8425632db3a6e833952c))
+* **scripts:** close the bootstrap gaps found by the canary drill ([37e02d4](https://github.com/willzhu16/platform/commit/37e02d432e6da7662ab571f13e02eea60bcb8f91))
+
 ## [1.3.0](https://github.com/willzhu16/platform/compare/v1.2.0...v1.3.0) (2026-07-11)
 
 
