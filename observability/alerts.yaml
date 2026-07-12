@@ -1,0 +1,84 @@
+# Grafana alert-rules template (spec 08 §3). Exactly two rules per project, mapping the
+# frozen severities in handbook/severity-levels.md:
+#
+#   SEV1 -> ntfy push (interrupt the human): error rate >5% for 5 min.
+#           Availability (health endpoint down) is owned by Upptime, which pushes to the
+#           same ntfy topic via its own notification config — not duplicated here.
+#   SEV3 -> email, batched (review weekly): a latency-budget breach worth recording.
+#
+# Routing is by the `severity` label, done in Grafana's notification policies. The two
+# contact points (ntfy webhook for SEV1, email for SEV3) and the policy are created
+# out-of-band per spec 08 §5 — the ntfy topic slug is a secret (spec 06 inventory).
+# Note: true scheduled "reports" are a Grafana Enterprise feature; on Cloud free the SEV3
+# "weekly digest" is the batched email (long group interval) plus the weekly cadence review
+# of this dashboard (handbook/cadences.md → weekly).
+#
+# Fill ${METRICS_DS_UID} and ${project} at import time (observability/README.md).
+
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: ${project}-health
+    folder: Alerts
+    interval: 1m
+    rules:
+      - uid: ${project}-sev1-error-rate
+        title: 'SEV1 — error rate >5% (5m)'
+        condition: THRESHOLD
+        for: 5m
+        noDataState: OK
+        execErrState: Alerting
+        labels:
+          severity: SEV1
+        annotations:
+          summary: '${project}: 5xx error rate above 5% for 5 minutes — production likely degraded.'
+        data:
+          - refId: RATE
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: ${METRICS_DS_UID}
+            model:
+              refId: RATE
+              editorMode: code
+              expr: >-
+                100 * sum(rate(http_server_requests_total{project="${project}",status=~"5.."}[5m]))
+                / clamp_min(sum(rate(http_server_requests_total{project="${project}"}[5m])), 1)
+              instant: true
+          - refId: THRESHOLD
+            datasourceUid: __expr__
+            model:
+              refId: THRESHOLD
+              type: threshold
+              expression: RATE
+              conditions:
+                - evaluator: { type: gt, params: [5] }
+
+      - uid: ${project}-sev3-latency
+        title: 'SEV3 — p95 latency >1s (15m)'
+        condition: THRESHOLD
+        for: 15m
+        noDataState: OK
+        execErrState: OK
+        labels:
+          severity: SEV3
+        annotations:
+          summary: '${project}: p95 request latency above 1s for 15 minutes — review in the weekly digest.'
+        data:
+          - refId: P95
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: ${METRICS_DS_UID}
+            model:
+              refId: P95
+              editorMode: code
+              expr: >-
+                histogram_quantile(0.95,
+                sum(rate(http_server_request_duration_ms_bucket{project="${project}"}[5m])) by (le))
+              instant: true
+          - refId: THRESHOLD
+            datasourceUid: __expr__
+            model:
+              refId: THRESHOLD
+              type: threshold
+              expression: P95
+              conditions:
+                - evaluator: { type: gt, params: [1000] }

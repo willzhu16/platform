@@ -1,0 +1,62 @@
+# Observability — {{ project_name }}
+
+How this project is observed (spec 08). Everything here is free-tier ($0). The goal:
+**observable from birth** — structured logs queryable, golden signals dashboarded, errors
+tied to releases, uptime public, SEV1s pushed to your phone.
+
+## Signal map
+
+| Signal | Producer | Destination | Status in this repo |
+|---|---|---|---|
+| Logs | `src/lib/log.ts` (frozen schema) | Workers Logs → Grafana Loki | **shipped** (structured JSONL); Loki export wired at setup |
+| Metrics | OTel counters/histograms + Workers built-ins | Grafana Mimir | wire per project (OTLP secret below) |
+| Traces | OTel auto-instrumentation | Grafana Tempo | wire per project (same OTLP pipeline) |
+| Errors | `@sentry/cloudflare` | Sentry free tier | wire per project (DSN secret; `release` = version tag) |
+| Uptime | Upptime repo `willzhu16/status` | GitHub Pages status page | add this app's URL to that repo |
+| Cron heartbeat | `scheduled()` handler | healthchecks.io | **stub shipped** when `needs_scheduled_jobs`; point it at a check |
+
+"Shipped" = already in the generated code. The rest are wired at first deploy via the
+out-of-band steps below — metrics/traces/errors need accounts and secrets, so they can't be
+baked into source.
+
+## Health endpoint (shipped, frozen contract)
+
+`GET /healthz` → `200 {"version":"<tag>"}` — no auth, no side effects, no binding fan-out.
+It answers "is the Worker alive", not "is every binding happy" (binding health is a metric,
+not an uptime probe). Consumed by Upptime, the release smoke check, and rollback
+verification (spec 07). Do not add dependency checks to it.
+
+## Logs
+
+`src/lib/log.ts` emits one JSON object per line against the frozen log schema
+(`handbook/log-schema.json`): `ts`, `level`, `event`, `projectVersion` always present;
+`event` is the primary query key. Query in Loki by `event`. Never log secrets, PII, or the
+bodies of auth/billing routes.
+
+## Dashboard & alerts
+
+- Dashboard: import `platform/observability/dashboard-project-health.json`. On import pick
+  your Metrics (Mimir) and Logs (Loki) datasources and set `$project` to `{{ project_name }}`.
+  Panels: request rate, error rate, p50/p95 latency, log volume, deploy annotations.
+- Alerts: `platform/observability/alerts.yaml` — two rules mapping the frozen severities.
+  **SEV1** (error rate >5% for 5 min) → ntfy push. **SEV3** (p95 >1s for 15 min) → batched
+  email. Availability is covered by Upptime, which pushes downtime to the same ntfy topic.
+
+## Backups & restore (spec 08 §4b)
+
+Recovery point objective at solo scale: **24h**. If this project stores source-of-truth
+data in D1, a nightly `wrangler d1 export` → the `backups-{{ project_name }}` R2 bucket keeps
+30 daily + 6 monthly copies. R2 buckets holding user data get object versioning on; KV is
+treated as rebuildable cache (say otherwise in `THREAT.md` if it isn't). **A backup that has
+not been restored is a rumor** — the quarterly cadence restores the latest export into a
+scratch database and runs the smoke test.
+
+## Out-of-band setup (human, once per project)
+
+1. Create a Grafana Cloud free account; provision OTLP + Loki tokens → `wrangler secret put`
+   (`OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS`, Loki push token) per the
+   spec 06 secret-store pattern.
+2. Create a Sentry project → `wrangler secret put SENTRY_DSN`.
+3. Add this app's public URL to `willzhu16/status` (Upptime).
+4. Import the dashboard (above); confirm `/healthz` shows green in Upptime.
+5. Subscribe the ntfy app on your phone to the SEV1 topic.

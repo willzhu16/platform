@@ -1,0 +1,120 @@
+{
+  "__comment": "Project-health dashboard template (spec 08 §3). Import per project via the step in observability/README.md: pick the Metrics (Mimir/Prometheus) and Logs (Loki) datasources when prompted, then set $project to the repo slug. Panel queries assume OTel/Workers metric names; adjust to the project's actual series if they differ. Grafana Cloud free has no tofu-able API headroom worth automating at solo scale, so this stays a documented import rather than IaC.",
+  "title": "Project health — ${project}",
+  "uid": "project-health",
+  "tags": ["artemis", "project-health"],
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "1m",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "metrics",
+        "label": "Metrics datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {}
+      },
+      {
+        "name": "logs",
+        "label": "Logs datasource",
+        "type": "datasource",
+        "query": "loki",
+        "current": {}
+      },
+      {
+        "name": "project",
+        "label": "Project",
+        "type": "textbox",
+        "query": "",
+        "current": { "text": "", "value": "" }
+      }
+    ]
+  },
+  "annotations": {
+    "list": [
+      {
+        "name": "Deploys",
+        "datasource": { "type": "loki", "uid": "${logs}" },
+        "enable": true,
+        "iconColor": "green",
+        "target": {
+          "expr": "{project=\"${project}\"} | json | event=`release_deployed`",
+          "refId": "Deploys"
+        },
+        "titleFormat": "deploy {{projectVersion}}"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Request rate (req/s)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${metrics}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(http_server_requests_total{project=\"${project}\"}[$__rate_interval]))"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Error rate (%)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${metrics}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0 }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * sum(rate(http_server_requests_total{project=\"${project}\",status=~\"5..\"}[$__rate_interval])) / clamp_min(sum(rate(http_server_requests_total{project=\"${project}\"}[$__rate_interval])), 1)"
+        }
+      ],
+      "thresholds": {
+        "steps": [
+          { "value": 0, "color": "green" },
+          { "value": 5, "color": "red" }
+        ]
+      }
+    },
+    {
+      "id": 3,
+      "title": "Latency p50 / p95 (ms)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${metrics}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "p50",
+          "legendFormat": "p50",
+          "expr": "histogram_quantile(0.50, sum(rate(http_server_request_duration_ms_bucket{project=\"${project}\"}[$__rate_interval])) by (le))"
+        },
+        {
+          "refId": "p95",
+          "legendFormat": "p95",
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_request_duration_ms_bucket{project=\"${project}\"}[$__rate_interval])) by (le))"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Log volume by level",
+      "type": "timeseries",
+      "datasource": { "type": "loki", "uid": "${logs}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "{{level}}",
+          "expr": "sum by (level) (count_over_time({project=\"${project}\"} | json [$__auto]))"
+        }
+      ]
+    }
+  ]
+}
