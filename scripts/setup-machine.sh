@@ -16,16 +16,18 @@ have() { command -v "$1" >/dev/null 2>&1; }
 
 grep -qi microsoft /proc/version 2>/dev/null || warn 'not detected as WSL2 — this script targets Ubuntu/WSL2 (D-20)'
 
-# ---- 1. OS packages (apt): git, curl, age, gitleaks -----------------------
+# ---- 1. OS packages (apt): git, curl, jq, age, gitleaks, gh ----------------
+# jq and gh are hard preflight requirements of new-project.sh, whose error text
+# sends people here — so this script must actually deliver them.
 step '1. Base OS packages'
 if have apt-get; then
   sudo apt-get update -qq
-  for pkg in git curl age gitleaks; do
+  for pkg in git curl jq age gitleaks gh; do
     have "$pkg" || sudo apt-get install -y -qq "$pkg" || warn "apt could not install $pkg (install manually)"
   done
-  ok 'git, curl, age, gitleaks'
+  ok 'git, curl, jq, age, gitleaks, gh'
 else
-  warn 'apt-get not found — install git, curl, age, gitleaks with your package manager'
+  warn 'apt-get not found — install git, curl, jq, age, gitleaks, gh with your package manager'
 fi
 
 # ---- 2. mise → Node LTS + Python ------------------------------------------
@@ -116,7 +118,7 @@ fi
 # ---- Self-check table ------------------------------------------------------
 step 'Self-check'
 printf '  %-10s %-12s %s\n' TOOL VERSION STATUS
-for tool in git mise node pnpm python uv copier sops age gitleaks gh wrangler; do
+for tool in git jq mise node pnpm python uv copier sops age gitleaks gh wrangler; do
   if have "$tool"; then
     ver="$("$tool" --version 2>/dev/null | head -1 | grep -oE '[0-9]+(\.[0-9]+)+' | head -1)"
     printf '  %-10s %-12s \033[32m✔\033[0m\n' "$tool" "${ver:-?}"
