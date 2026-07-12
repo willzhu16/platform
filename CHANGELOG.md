@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.0](https://github.com/willzhu16/platform/compare/v1.4.0...v1.5.0) (2026-07-12)
+
+
+### Features
+
+* **observability:** add health dashboard, alerts, project guide (spec 08) ([bf1018d](https://github.com/willzhu16/platform/commit/bf1018dfe282d0dd62511753d7af510efa6782bd))
+* **security:** add perimeter hardening scaffolding (spec 12) ([16a53bb](https://github.com/willzhu16/platform/commit/16a53bba720a52143587832224d37530ef3c1776))
+
 ## [1.4.0](https://github.com/willzhu16/platform/compare/v1.3.0...v1.4.0) (2026-07-12)
 
 
