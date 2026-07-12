@@ -22,6 +22,8 @@ The workflow embeds a copy of these checklists (`CHECKLISTS`); edit both togethe
 ## Quarterly (Jan / Apr / Jul / Oct)
 
 - [ ] **Token rotation + access review** — walk the spec 06 secrets inventory.
+- [ ] **Session & device review** — review active sessions / devices / OAuth apps on GitHub
+      + Cloudflare; revoke anything unrecognized same-day (spec 12 §2.1).
 - [ ] **Restore test** — actually restore from backup (spec 08); an untested backup is a
       guess.
 - [ ] **Stale sweep** — remove feature flags past 100% rollout and stale branches.
