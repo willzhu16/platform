@@ -1,5 +1,10 @@
 # Grafana alert-rules template (spec 08 §3). Exactly two rules per project, mapping the
-# frozen severities in handbook/severity-levels.md:
+# frozen severities in handbook/severity-levels.md.
+#
+# NOTE (2026-07): both rules query http_server_* metrics a free Cloudflare Worker cannot
+# emit yet (see observability/README.md) — these activate once a metrics pipeline exists.
+# Availability alerting works today via Upptime → ntfy, independent of these rules.
+#
 #
 #   SEV1 -> ntfy push (interrupt the human): error rate >5% for 5 min.
 #           Availability (health endpoint down) is owned by Upptime, which pushes to the

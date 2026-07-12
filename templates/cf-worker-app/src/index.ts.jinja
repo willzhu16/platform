@@ -1,9 +1,12 @@
+import * as Sentry from '@sentry/cloudflare';
 import { createLogger } from './lib/log.js';
 import { buildSecurityTxt } from './lib/security-txt.js';
 import { withSecurityHeaders } from './middleware/security-headers.js';
 
 export interface Env {
   PROJECT_VERSION: string;
+  // Error reporting (spec 08). Set with `wrangler secret put SENTRY_DSN`; unset = disabled.
+  SENTRY_DSN?: string;
 {%- if 'kv' in bindings %}
   KV: KVNamespace;
 {%- endif %}
@@ -34,7 +37,7 @@ const handle = (request: Request, env: Env): Response => {
   return new Response('Hello from {{ project_name }}');
 };
 
-export default {
+const handler = {
   async fetch(request: Request, env: Env): Promise<Response> {
     const version = env.PROJECT_VERSION || 'dev';
     const logger = createLogger(version);
@@ -47,6 +50,7 @@ export default {
       return withSecurityHeaders(response);
     } catch (error) {
       const err = error as Error;
+      Sentry.captureException(err);
       logger.error({ event: 'request_failed', requestId, route, err: { message: err.message } });
       return withSecurityHeaders(new Response('Internal Error', { status: 500 }));
     }
@@ -58,4 +62,17 @@ export default {
     createLogger(env.PROJECT_VERSION || 'dev').info({ event: 'cron_heartbeat' });
   },
 {%- endif %}
-};
+} satisfies ExportedHandler<Env>;
+
+// Report unhandled errors to Sentry, tagged with the release (spec 08). Errors only:
+// tracesSampleRate 0 stays inside Sentry's free quota (and Cloudflare's own tracing is
+// now paid). An unset SENTRY_DSN safely disables Sentry — no events, no error.
+export default Sentry.withSentry(
+  (env: Env) => ({
+    dsn: env.SENTRY_DSN,
+    release: env.PROJECT_VERSION || 'dev',
+    tracesSampleRate: 0,
+    sendDefaultPii: false,
+  }),
+  handler,
+);
