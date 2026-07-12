@@ -17,6 +17,7 @@ on:
       - 'selftest-fixture-py/**'
       - 'templates/**'
       - 'copier.yml'
+      - 'scripts/**'
 
 permissions:
   contents: read
@@ -34,6 +35,17 @@ jobs:
         uses: docker://rhysd/actionlint:1.7.7
         with:
           args: -color
+
+  # scripts/ had no gate at all until the canary drill's fix PR itself shipped without
+  # checks. Gate at warning severity: real problems fail, style notes don't.
+  lint-scripts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker://koalaman/shellcheck:v0.11.0
+        with:
+          args: --severity=warning scripts/new-project.sh scripts/setup-machine.sh
 
   ci:
     uses: ./.github/workflows/ci.yml
