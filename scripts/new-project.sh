@@ -122,6 +122,12 @@ else
     || fail 'gh repo create failed'
   ok "created ${OWNER}/${NAME} (${VISIBILITY}) and pushed main"
 fi
+# Allow workflows to open PRs — off by default on new repos, and athena-sync's weekly
+# drift PR needs it (found live by the canary drill). Outside the guard: idempotent.
+gh api -X PUT "repos/${OWNER}/${NAME}/actions/permissions/workflow" \
+  -f default_workflow_permissions=read -F can_approve_pull_request_reviews=true >/dev/null \
+  || fail 'setting Actions workflow permissions failed'
+ok 'Actions may create PRs (athena-sync drift PRs)'
 
 # ---- 6. Apply the main ruleset ---------------------------------------------
 step '6. Apply main ruleset'
