@@ -120,7 +120,10 @@ step 'Self-check'
 printf '  %-10s %-12s %s\n' TOOL VERSION STATUS
 for tool in git jq mise node pnpm python uv copier sops age gitleaks gh wrangler; do
   if have "$tool"; then
-    ver="$("$tool" --version 2>/dev/null | head -1 | grep -oE '[0-9]+(\.[0-9]+)+' | head -1)"
+    # `|| true`: with `set -euo pipefail` a bare assignment whose pipeline fails aborts the
+    # script, and grep exits 1 when a tool prints no dotted version to stdout (gitleaks,
+    # age). The self-check table must never kill the run it is diagnosing.
+    ver="$("$tool" --version 2>/dev/null | head -1 | grep -oE '[0-9]+(\.[0-9]+)+' | head -1 || true)"
     printf '  %-10s %-12s \033[32m✔\033[0m\n' "$tool" "${ver:-?}"
   else
     printf '  %-10s %-12s \033[31m✘\033[0m\n' "$tool" '-'
