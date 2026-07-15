@@ -67,17 +67,19 @@ if [ -d "$NAME" ]; then
 else
   DATA_FILE="$(mktemp)"
   trap 'rm -f "$DATA_FILE"' EXIT
+  # DESCRIPTION and BINDINGS are free text (unlike NAME/TEMPLATE/VISIBILITY, which are
+  # validated above), so they go through jq rather than bare interpolation: a description
+  # containing ": " is not a valid YAML plain scalar, and a newline would inject a second
+  # answer key. jq emits a JSON string/array, which is valid YAML.
   {
     echo "template: ${TEMPLATE}"
     echo "project_name: ${NAME}"
-    echo "description: ${DESCRIPTION}"
+    echo "description: $(jq -n --arg d "$DESCRIPTION" '$d')"
     echo "visibility: ${VISIBILITY}"
     if [ "$TEMPLATE" = 'cf-worker-app' ]; then
       echo "needs_scheduled_jobs: ${SCHEDULED}"
       echo "public_forms: ${PUBLIC_FORMS}"
-      echo -n 'bindings: ['
-      echo -n "$(echo "$BINDINGS" | tr ',' '\n' | sed '/^$/d' | sed 's/.*/"&"/' | paste -sd, -)"
-      echo ']'
+      echo "bindings: $(jq -cn --arg b "$BINDINGS" '$b | split(",") | map(select(length > 0))')"
     fi
   } > "$DATA_FILE"
   copier copy --defaults --data-file "$DATA_FILE" "$PLATFORM_SRC" "$NAME" \
