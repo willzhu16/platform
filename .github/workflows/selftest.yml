@@ -46,7 +46,23 @@ jobs:
       - uses: actions/checkout@v4
       - uses: docker://koalaman/shellcheck:v0.11.0
         with:
-          args: --severity=warning scripts/new-project.sh scripts/setup-machine.sh
+          args: >-
+            --severity=warning scripts/new-project.sh scripts/setup-machine.sh
+            scripts/lib.sh scripts/tests.sh
+
+  # scripts/tests.sh regression-tests the pure logic extracted into scripts/lib.sh — the
+  # entry scripts themselves can never run in CI (they create real GitHub repos / mutate
+  # the machine). PyYAML is installed explicitly: the tests hard-fail without it rather
+  # than pass vacuously, so the dependency must be guaranteed here.
+  test-scripts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PyYAML
+        run: python3 -m pip install pyyaml
+      - name: Run the script regression tests
+        run: bash scripts/tests.sh
 
   # security/semgrep/ had no gate: a rule that silently stops matching produces a green
   # scan indistinguishable from a clean one (artemis-js-child-process-exec missed every
