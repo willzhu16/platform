@@ -9,6 +9,10 @@
 # Optional overrides: GIT_USER_NAME, GIT_USER_EMAIL (set git identity non-interactively).
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib.sh
+. "${SCRIPT_DIR}/lib.sh"
+
 ok()   { printf '  \033[32m✔\033[0m %s\n' "$1"; }
 warn() { printf '  \033[33m!\033[0m %s\n' "$1"; }
 step() { printf '\n\033[1m%s\033[0m\n' "$1"; }
@@ -120,10 +124,7 @@ step 'Self-check'
 printf '  %-10s %-12s %s\n' TOOL VERSION STATUS
 for tool in git jq mise node pnpm python uv copier sops age gitleaks gh wrangler; do
   if have "$tool"; then
-    # `|| true`: with `set -euo pipefail` a bare assignment whose pipeline fails aborts the
-    # script, and grep exits 1 when a tool prints no dotted version to stdout (gitleaks,
-    # age). The self-check table must never kill the run it is diagnosing.
-    ver="$("$tool" --version 2>/dev/null | head -1 | grep -oE '[0-9]+(\.[0-9]+)+' | head -1 || true)"
+    ver="$(tool_version "$tool")" # scripts/lib.sh — tested by scripts/tests.sh
     printf '  %-10s %-12s \033[32m✔\033[0m\n' "$tool" "${ver:-?}"
   else
     printf '  %-10s %-12s \033[31m✘\033[0m\n' "$tool" '-'

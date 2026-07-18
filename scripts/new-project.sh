@@ -18,6 +18,9 @@ PLATFORM_SRC="${PLATFORM_SRC:-gh:${PLATFORM_REPO}}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLATFORM_ROOT="$(dirname "${SCRIPT_DIR}")"
 
+# shellcheck source=scripts/lib.sh
+. "${SCRIPT_DIR}/lib.sh"
+
 ok()   { printf '  \033[32m✔\033[0m %s\n' "$1"; }
 fail() { printf '  \033[31m✘\033[0m %s\n' "$1" >&2; [ -n "${2:-}" ] && printf '    → %s\n' "$2" >&2; exit 1; }
 step() { printf '\n\033[1m%s\033[0m\n' "$1"; }
@@ -67,21 +70,7 @@ if [ -d "$NAME" ]; then
 else
   DATA_FILE="$(mktemp)"
   trap 'rm -f "$DATA_FILE"' EXIT
-  # DESCRIPTION and BINDINGS are free text (unlike NAME/TEMPLATE/VISIBILITY, which are
-  # validated above), so they go through jq rather than bare interpolation: a description
-  # containing ": " is not a valid YAML plain scalar, and a newline would inject a second
-  # answer key. jq emits a JSON string/array, which is valid YAML.
-  {
-    echo "template: ${TEMPLATE}"
-    echo "project_name: ${NAME}"
-    echo "description: $(jq -n --arg d "$DESCRIPTION" '$d')"
-    echo "visibility: ${VISIBILITY}"
-    if [ "$TEMPLATE" = 'cf-worker-app' ]; then
-      echo "needs_scheduled_jobs: ${SCHEDULED}"
-      echo "public_forms: ${PUBLIC_FORMS}"
-      echo "bindings: $(jq -cn --arg b "$BINDINGS" '$b | split(",") | map(select(length > 0))')"
-    fi
-  } > "$DATA_FILE"
+  build_answers_file > "$DATA_FILE" # scripts/lib.sh — tested by scripts/tests.sh
   copier copy --defaults --data-file "$DATA_FILE" "$PLATFORM_SRC" "$NAME" \
     || fail 'copier generation failed' 'check the template answers above'
   ok "generated ./$NAME from $TEMPLATE"
