@@ -23,6 +23,13 @@ on:
         type: string
         default: '24'
 
+# Declared explicitly like every sibling reusable workflow: without this the job silently
+# inherits whatever the caller granted, so there is no least-privilege floor. A called
+# workflow can only ever narrow the caller's grant, never widen it.
+permissions:
+  contents: write # commit + force-push the chore/athena-sync branch
+  pull-requests: write # open the sync PR
+
 defaults:
   run:
     shell: bash

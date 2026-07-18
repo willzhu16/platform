@@ -10,12 +10,53 @@ rules:
       cwe: 'CWE-78: Improper Neutralization of Special Elements used in an OS Command'
       references:
         - https://owasp.org/www-community/attacks/Command_Injection
+    # Semgrep resolves a bare "child_process" specifier back to the qualified form, so the
+    # first two patterns already cover every un-prefixed import/require/destructure style.
+    # It does NOT resolve the "node:"-prefixed specifier — which is the style this org
+    # writes — so those forms are matched explicitly. The destructured cases name the
+    # imported symbol so an `exec` from an unrelated module is not flagged.
     patterns:
       - pattern-either:
           - pattern: child_process.exec($CMD, ...)
           - pattern: child_process.execSync($CMD, ...)
+          - patterns:
+              - pattern-either:
+                  - pattern-inside: |
+                      import * as $CP from "node:child_process";
+                      ...
+                  - pattern-inside: |
+                      import $CP from "node:child_process";
+                      ...
+                  - pattern-inside: |
+                      const $CP = require("node:child_process");
+                      ...
+              - pattern-either:
+                  - pattern: $CP.exec($CMD, ...)
+                  - pattern: $CP.execSync($CMD, ...)
+          - patterns:
+              - pattern-either:
+                  - pattern-inside: |
+                      import { ..., exec, ... } from "node:child_process";
+                      ...
+                  - pattern-inside: |
+                      const { ..., exec, ... } = require("node:child_process");
+                      ...
+              - pattern: exec($CMD, ...)
+          - patterns:
+              - pattern-either:
+                  - pattern-inside: |
+                      import { ..., execSync, ... } from "node:child_process";
+                      ...
+                  - pattern-inside: |
+                      const { ..., execSync, ... } = require("node:child_process");
+                      ...
+              - pattern: execSync($CMD, ...)
       - pattern-not: child_process.exec('...', ...)
       - pattern-not: child_process.execSync('...', ...)
+      - pattern-not: $CP.exec('...', ...)
+      - pattern-not: $CP.execSync('...', ...)
+      - pattern-not: exec('...', ...)
+      - pattern-not: execSync('...', ...)
 
   - id: artemis-js-eval-nonliteral
     message: >-
