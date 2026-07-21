@@ -143,7 +143,7 @@ jobs:
         # 'auto' scans the repo recursively (osv-scanner finds every supported lockfile);
         # pass explicit paths via the osv-lockfiles input when auto-detection misfires.
         # An in-repo osv-scanner.toml may ignore specific advisory IDs (spec 02 §3.3).
-        uses: google/osv-scanner-action/osv-scanner-action@v2.3.8
+        uses: google/osv-scanner-action/osv-scanner-action@9a498708959aeaef5ef730655706c5a1df1edbc2 # v2.3.8
         with:
           scan-args: |-
             --recursive

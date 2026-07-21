@@ -45,7 +45,7 @@ jobs:
           repository: ${{ github.repository_owner }}/athena
           ref: ${{ inputs.athena-ref }}
           path: .athena-src
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
         with:
           # Resolve the pnpm version from athena's packageManager field — the caller
           # repo may not even be a Node project (py-tool).

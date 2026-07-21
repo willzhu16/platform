@@ -105,7 +105,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # copier renders from the git HEAD, not the working tree
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
       - name: Render the template (all features on)
         run: |
           cat > "$RUNNER_TEMP/answers.yml" <<'EOF'
@@ -119,7 +119,7 @@ jobs:
           EOF
           uvx --from copier copier copy --defaults --vcs-ref HEAD \
             --data-file "$RUNNER_TEMP/answers.yml" . render-out
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
         with:
           package_json_file: render-out/package.json
       - uses: actions/setup-node@v4
@@ -143,7 +143,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # copier renders from the git HEAD, not the working tree
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
         with:
           python-version: '3.13'
       - name: Render the template
