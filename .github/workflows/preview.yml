@@ -36,9 +36,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: preview
+    # One preview deploy per PR at a time, newest wins. Without this, two pushes in
+    # quick succession race `wrangler versions upload` and the sticky-comment update,
+    # and the comment can end up pointing at the older push's preview URL. Job-level
+    # on purpose: workflow-level concurrency in a called reusable workflow is ignored;
+    # the group is already scoped to the caller's repository.
+    concurrency:
+      group: preview-deploy-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
         with:
           # Resolve the pnpm version from the project's packageManager field — the
           # default looks at the caller repo root, which may have no package.json.

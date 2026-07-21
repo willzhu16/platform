@@ -12,9 +12,12 @@ if (-not (Get-Command wsl -ErrorAction SilentlyContinue)) {
 }
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$wslPath = & wsl wslpath -a ($scriptDir -replace '\\', '/')
+$wslPath = & wsl --exec wslpath -a ($scriptDir -replace '\\', '/')
 $wslPath = "$($wslPath.Trim())/new-project.sh"
 
-# Forward every argument verbatim to the bash script under WSL2.
-& wsl bash "$wslPath" @args
+# Forward every argument verbatim to the bash script under WSL2. `--exec` is what makes
+# "verbatim" true: without it wsl.exe hands the arguments to the default Linux shell,
+# which expands `$VAR`, backticks, and globs inside them — verified: a description
+# containing `$HOME` arrived expanded to /home/<user>. `--exec` bypasses that shell.
+& wsl --exec bash "$wslPath" @args
 exit $LASTEXITCODE
