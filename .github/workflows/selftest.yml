@@ -19,6 +19,7 @@ on:
       - 'copier.yml'
       - 'scripts/**'
       - 'security/**'
+      - 'observability/**'
 
 permissions:
   contents: read
@@ -63,6 +64,32 @@ jobs:
         run: python3 -m pip install pyyaml
       - name: Run the script regression tests
         run: bash scripts/tests.sh
+
+  # observability/ (Grafana dashboard JSON + alert rules YAML) lives at the platform
+  # root, which has no package to run, so nothing gated it — a bad edit could rot
+  # silently (TODO item from the spec 08 build). Parse every file; finding none is a
+  # failure, so the job can never pass vacuously after a rename.
+  lint-observability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PyYAML
+        run: python3 -m pip install pyyaml
+      - name: Parse every dashboard and alert file
+        run: |
+          python3 - <<'PY'
+          import glob, json, sys, yaml
+          json_files = glob.glob('observability/**/*.json', recursive=True)
+          yaml_files = glob.glob('observability/**/*.y*ml', recursive=True)
+          if not json_files and not yaml_files:
+              sys.exit('no observability files found - job and directory out of sync')
+          for path in json_files:
+              json.load(open(path))
+          for path in yaml_files:
+              yaml.safe_load(open(path))
+          print(f'parsed {len(json_files)} json + {len(yaml_files)} yaml file(s)')
+          PY
 
   # security/semgrep/ had no gate: a rule that silently stops matching produces a green
   # scan indistinguishable from a clean one (artemis-js-child-process-exec missed every
