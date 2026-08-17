@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.5.1](https://github.com/willzhu16/platform/compare/v1.5.0...v1.5.1) (2026-08-17)
+
+
+### Bug Fixes
+
+* **ci:** declare permissions on the athena-sync workflow ([e2a2f1e](https://github.com/willzhu16/platform/commit/e2a2f1e6538b00a8f3a22e8a5135a3ad14d143f9))
+* **preview:** serialize preview deploys per PR ([2489a27](https://github.com/willzhu16/platform/commit/2489a2714eb22bf209a8ee7e4644f7b0ccb07acf))
+* **scripts:** emit copier answers through jq ([aed8b66](https://github.com/willzhu16/platform/commit/aed8b66c962e25e9dbb761b525186faf68fb5063))
+* **scripts:** stop new-project.ps1 shell-expanding forwarded args ([d952d9e](https://github.com/willzhu16/platform/commit/d952d9e49bc398018f9041ddf12e6d457d97eabb))
+* **scripts:** stop the self-check table aborting under set -e ([f6d5929](https://github.com/willzhu16/platform/commit/f6d59290d468489b9a433640f5b2e5b243e8602e))
+* **security:** catch node:-prefixed child_process imports ([7ee5853](https://github.com/willzhu16/platform/commit/7ee585352ad4cda77e767351cbfdf3a137b4a0ed))
+* tooling bugs from the 2026-07-15 review, with regression tests ([4cb899e](https://github.com/willzhu16/platform/commit/4cb899e7f42af6a0bee5552f9b5e0d8a4f42901f))
+
 ## [1.5.0](https://github.com/willzhu16/platform/compare/v1.4.0...v1.5.0) (2026-07-12)
 
 
