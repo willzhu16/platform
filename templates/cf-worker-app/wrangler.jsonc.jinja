@@ -3,6 +3,8 @@
   "name": "{{ project_name }}",
   "main": "src/index.ts",
   "compatibility_date": "2025-06-01",
+  // nodejs_compat is required by @sentry/cloudflare (AsyncLocalStorage) — see src/index.ts.
+  "compatibility_flags": ["nodejs_compat"],
   "observability": {
     "enabled": true
   },

@@ -8,16 +8,18 @@ tied to releases, uptime public, SEV1s pushed to your phone.
 
 | Signal | Producer | Destination | Status in this repo |
 |---|---|---|---|
+| Errors | `@sentry/cloudflare` (wired in) | Sentry free tier | **shipped** — `wrangler secret put SENTRY_DSN` to activate; `release` = version tag |
 | Logs | `src/lib/log.ts` (frozen schema) | Workers Logs → Grafana Loki | **shipped** (structured JSONL); Loki export wired at setup |
-| Metrics | OTel counters/histograms + Workers built-ins | Grafana Mimir | wire per project (OTLP secret below) |
-| Traces | OTel auto-instrumentation | Grafana Tempo | wire per project (same OTLP pipeline) |
-| Errors | `@sentry/cloudflare` | Sentry free tier | wire per project (DSN secret; `release` = version tag) |
 | Uptime | Upptime repo `willzhu16/status` | GitHub Pages status page | add this app's URL to that repo |
 | Cron heartbeat | `scheduled()` handler | healthchecks.io | **stub shipped** when `needs_scheduled_jobs`; point it at a check |
+| Metrics | OTel counters/histograms | Grafana Mimir | **deferred** — Workers can't export custom metrics via OTel yet |
+| Traces | OTel auto-instrumentation | Grafana Tempo | **deferred** — Cloudflare tracing is a paid feature since 2026-03 |
 
-"Shipped" = already in the generated code. The rest are wired at first deploy via the
-out-of-band steps below — metrics/traces/errors need accounts and secrets, so they can't be
-baked into source.
+"Shipped" = already in the generated code. **Errors are wired in**: unhandled exceptions go
+to Sentry automatically once `SENTRY_DSN` is set (an unset DSN safely disables it — no
+events, no error). Metrics/traces are **deferred**: a free Worker currently has no free path
+to emit them, so use Cloudflare's built-in Workers analytics dashboard for request/latency
+graphs meanwhile, and revisit when Cloudflare's OTel metrics export ships.
 
 ## Health endpoint (shipped, frozen contract)
 
@@ -35,12 +37,12 @@ bodies of auth/billing routes.
 
 ## Dashboard & alerts
 
-- Dashboard: import `platform/observability/dashboard-project-health.json`. On import pick
-  your Metrics (Mimir) and Logs (Loki) datasources and set `$project` to `{{ project_name }}`.
-  Panels: request rate, error rate, p50/p95 latency, log volume, deploy annotations.
-- Alerts: `platform/observability/alerts.yaml` — two rules mapping the frozen severities.
-  **SEV1** (error rate >5% for 5 min) → ntfy push. **SEV3** (p95 >1s for 15 min) → batched
-  email. Availability is covered by Upptime, which pushes downtime to the same ntfy topic.
+The `platform/observability/dashboard-project-health.json` dashboard and `alerts.yaml`
+rules target a Grafana metrics pipeline. Its request-rate / latency / error-rate panels
+need the `http_server_*` metrics that a free Worker **cannot emit yet** (see the deferred
+rows above), so hold the metrics-based dashboard until that pipeline exists. Available now
+without metrics: **Sentry** for error trends and release regressions, **Upptime** for
+availability, and the **Cloudflare dashboard** for built-in request/latency graphs.
 
 ## Backups & restore (spec 08 §4b)
 
@@ -53,10 +55,9 @@ scratch database and runs the smoke test.
 
 ## Out-of-band setup (human, once per project)
 
-1. Create a Grafana Cloud free account; provision OTLP + Loki tokens → `wrangler secret put`
-   (`OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS`, Loki push token) per the
-   spec 06 secret-store pattern.
-2. Create a Sentry project → `wrangler secret put SENTRY_DSN`.
-3. Add this app's public URL to `willzhu16/status` (Upptime).
-4. Import the dashboard (above); confirm `/healthz` shows green in Upptime.
-5. Subscribe the ntfy app on your phone to the SEV1 topic.
+1. Create a Sentry project (free Developer plan) → `wrangler secret put SENTRY_DSN`. This
+   is the one that lights up real signal today; skip it and Sentry stays dormant.
+2. Add this app's public URL to `willzhu16/status` (Upptime); confirm `/healthz` goes green.
+3. Subscribe the ntfy app on your phone to the SEV1 topic (Upptime downtime → ntfy).
+4. Deferred until Cloudflare's metrics export ships: Grafana Cloud account + OTLP/Loki
+   tokens, then import the dashboard.
