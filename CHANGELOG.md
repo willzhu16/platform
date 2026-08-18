@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.6.0](https://github.com/willzhu16/platform/compare/v1.5.1...v1.6.0) (2026-08-18)
+
+
+### Features
+
+* **observability:** wire Sentry error tracking into cf-worker-app ([1718740](https://github.com/willzhu16/platform/commit/1718740176b2075dccdfa8a1c79ddb87d4b915d7))
+* **observability:** wire Sentry error tracking into cf-worker-app (spec 08) ([995c656](https://github.com/willzhu16/platform/commit/995c656575a2a0634c151fea39cb925b32ec6e87))
+
 ## [1.5.1](https://github.com/willzhu16/platform/compare/v1.5.0...v1.5.1) (2026-08-17)
 
 
