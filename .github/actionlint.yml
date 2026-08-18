@@ -5,3 +5,8 @@ paths:
       # False positive: job.workflow_repository is a real context (security.yml relies
       # on it and its checks pass in CI); actionlint 1.7.7 doesn't know it yet.
       - 'property "workflow_repository" is not defined'
+  .github/workflows/backup-d1.yml:
+    ignore:
+      # Same false positive as security.yml: backup-d1.yml reads job.workflow_repository
+      # to fetch the shared retention policy from platform at the consumer's pinned ref.
+      - 'property "workflow_repository" is not defined'

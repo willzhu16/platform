@@ -20,6 +20,7 @@ on:
       - 'scripts/**'
       - 'security/**'
       - 'observability/**'
+      - 'backups/**'
 
 permissions:
   contents: read
@@ -65,30 +66,61 @@ jobs:
       - name: Run the script regression tests
         run: bash scripts/tests.sh
 
-  # observability/ (Grafana dashboard JSON + alert rules YAML) lives at the platform
-  # root, which has no package to run, so nothing gated it — a bad edit could rot
-  # silently (TODO item from the spec 08 build). Parse every file; finding none is a
-  # failure, so the job can never pass vacuously after a rename.
-  lint-observability:
+  # observability/ (Grafana dashboard JSON + alert rules YAML) and backups/ (the R2
+  # retention policy) live at the platform root, which has no package to run, so
+  # nothing gated them — a bad edit could rot silently. Parse every file; finding none
+  # in a directory is a failure, so the job can never pass vacuously after a rename.
+  lint-configs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - name: Install PyYAML
         run: python3 -m pip install pyyaml
-      - name: Parse every dashboard and alert file
+      - name: Parse every root config file
         run: |
           python3 - <<'PY'
           import glob, json, sys, yaml
-          json_files = glob.glob('observability/**/*.json', recursive=True)
-          yaml_files = glob.glob('observability/**/*.y*ml', recursive=True)
-          if not json_files and not yaml_files:
-              sys.exit('no observability files found - job and directory out of sync')
-          for path in json_files:
-              json.load(open(path))
-          for path in yaml_files:
-              yaml.safe_load(open(path))
-          print(f'parsed {len(json_files)} json + {len(yaml_files)} yaml file(s)')
+          total = 0
+          for directory in ('observability', 'backups'):
+              json_files = glob.glob(f'{directory}/**/*.json', recursive=True)
+              yaml_files = glob.glob(f'{directory}/**/*.y*ml', recursive=True)
+              if not json_files and not yaml_files:
+                  sys.exit(f'no {directory} files found - job and directory out of sync')
+              for path in json_files:
+                  json.load(open(path))
+              for path in yaml_files:
+                  yaml.safe_load(open(path))
+              total += len(json_files) + len(yaml_files)
+              print(f'{directory}: {len(json_files)} json + {len(yaml_files)} yaml')
+          print(f'parsed {total} file(s)')
+          PY
+      - name: Check the retention policy's shape
+        # This file governs DELETION. A typo like "Expiation" still parses as JSON and
+        # would silently disable expiry, so assert the keys R2 actually acts on.
+        run: |
+          python3 - <<'PY'
+          import json, sys
+          config = json.load(open('backups/r2-lifecycle.json'))
+          rules = config.get('Rules')
+          if not isinstance(rules, list) or not rules:
+              sys.exit('r2-lifecycle.json: Rules must be a non-empty list')
+          prefixes = set()
+          for rule in rules:
+              for key in ('ID', 'Status', 'Filter', 'Expiration'):
+                  if key not in rule:
+                      sys.exit(f'r2-lifecycle.json: rule {rule.get("ID")!r} missing {key}')
+              if rule['Status'] != 'Enabled':
+                  sys.exit(f'r2-lifecycle.json: rule {rule["ID"]!r} is not Enabled')
+              days = rule['Expiration'].get('Days')
+              if not isinstance(days, int) or days <= 0:
+                  sys.exit(f'r2-lifecycle.json: rule {rule["ID"]!r} needs a positive Days')
+              prefixes.add(rule['Filter'].get('Prefix'))
+          # backup-d1.yml writes to exactly these two prefixes; a rule set that misses
+          # one means those objects would never expire.
+          if prefixes != {'daily/', 'monthly/'}:
+              sys.exit(f'r2-lifecycle.json: prefixes {sorted(prefixes)} != daily/ + monthly/')
+          print(f'retention policy OK: {len(rules)} rules covering {sorted(prefixes)}')
           PY
 
   # security/semgrep/ had no gate: a rule that silently stops matching produces a green
