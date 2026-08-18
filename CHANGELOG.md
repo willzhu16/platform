@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.7.0](https://github.com/willzhu16/platform/compare/v1.6.0...v1.7.0) (2026-08-18)
+
+
+### Features
+
+* **backups:** add nightly D1 backup with service-enforced retention ([abcf89a](https://github.com/willzhu16/platform/commit/abcf89a9ae33cd7e3386d36f59a5600cb2c8fc62))
+* **backups:** add nightly D1 backup with service-enforced retention ([6839925](https://github.com/willzhu16/platform/commit/6839925199b1c7e8014fd6852cb775dea3ae6a5c))
+
 ## [1.6.0](https://github.com/willzhu16/platform/compare/v1.5.1...v1.6.0) (2026-08-18)
 
 
