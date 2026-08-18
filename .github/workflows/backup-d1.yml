@@ -1,0 +1,157 @@
+name: backup-d1-reusable
+
+# Nightly D1 backup (spec 08 §4b). Exports the project's D1 database with
+# `wrangler d1 export` and writes the dump to a per-project R2 bucket. Callers name
+# their job `backup`, so the check surfaces as `backup / export`.
+#
+# THIS WORKFLOW NEVER DELETES ANYTHING. Retention is enforced by R2 lifecycle rules
+# (backups/r2-lifecycle.json — 30 days under daily/, 190 under monthly/), applied on
+# every run so a hand-edited bucket converges back. A retention bug in an unattended
+# nightly job destroys the backups it exists to protect; handing expiry to the storage
+# service removes that failure class entirely rather than testing around it.
+#
+# Monthly copies are written as a SECOND copy on the 1st, not promoted out of daily/.
+# Nothing has to move an object later, so there is no second job to get wrong.
+#
+# Token: callers pass CLOUDFLARE_BACKUP_TOKEN, a NARROW token holding D1 read + R2
+# write and nothing else. Deliberately not the deploy token, which is gated behind the
+# tag-guarded `production` environment: an unattended nightly job must not be able to
+# deploy, and a leaked backup token must not reach the Workers.
+#
+# Restore (the half that makes this real) is documented in backups/README.md and
+# carried as a quarterly cadence checklist item.
+
+on:
+  workflow_call:
+    inputs:
+      database:
+        type: string
+        default: '' # empty → the repo name, which is what the template names the DB
+      bucket:
+        type: string
+        default: '' # empty → backups-<repo name>
+      working-directory:
+        type: string
+        default: '.'
+      node-version:
+        type: string
+        default: '24'
+    secrets:
+      CLOUDFLARE_BACKUP_TOKEN:
+        required: true
+
+permissions:
+  contents: read # the dump goes to R2, never to the repo
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve platform repo ref
+        id: platform
+        # A reusable workflow's `github.*` context is the CALLER's, so read the `job`
+        # context: `job.workflow_repository`/`job.workflow_sha` identify the repo +
+        # commit of the workflow file defining THIS job — platform at the consumer's
+        # pinned ref. Same pattern as security.yml.
+        run: |
+          echo "repository=${{ job.workflow_repository }}" >> "$GITHUB_OUTPUT"
+          echo "ref=${{ job.workflow_sha }}" >> "$GITHUB_OUTPUT"
+      - name: Fetch the shared retention policy from platform
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.platform.outputs.repository }}
+          ref: ${{ steps.platform.outputs.ref }}
+          sparse-checkout: backups/r2-lifecycle.json
+          sparse-checkout-cone-mode: false
+          path: .artemis-platform
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+        with:
+          package_json_file: ${{ inputs.working-directory }}/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: pnpm
+          cache-dependency-path: ${{ inputs.working-directory }}/pnpm-lock.yaml
+      - name: Install (wrangler comes from the project's own devDependencies)
+        working-directory: ${{ inputs.working-directory }}
+        run: pnpm install --frozen-lockfile
+
+      - name: Resolve database, bucket, and datestamp
+        id: names
+        # Inputs go through env rather than into the script text: they are caller-
+        # supplied and could otherwise carry shell metacharacters.
+        env:
+          DATABASE_INPUT: ${{ inputs.database }}
+          BUCKET_INPUT: ${{ inputs.bucket }}
+        run: |
+          repo_name="${GITHUB_REPOSITORY##*/}"
+          database="${DATABASE_INPUT:-$repo_name}"
+          bucket="${BUCKET_INPUT:-backups-$repo_name}"
+          for value in "$database" "$bucket"; do
+            if ! echo "$value" | grep -Eq '^[a-zA-Z0-9][a-zA-Z0-9._-]*$'; then
+              echo "::error::'$value' is not a valid database or bucket name"
+              exit 1
+            fi
+          done
+          {
+            echo "database=$database"
+            echo "bucket=$bucket"
+            echo "stamp=$(date -u +%Y-%m-%d)"
+            echo "day=$(date -u +%d)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Ensure the bucket exists and carries the retention policy
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_BACKUP_TOKEN }}
+          BUCKET: ${{ steps.names.outputs.bucket }}
+        run: |
+          if ! pnpm exec wrangler r2 bucket info "$BUCKET" >/dev/null 2>&1; then
+            echo "creating bucket $BUCKET"
+            pnpm exec wrangler r2 bucket create "$BUCKET"
+          fi
+          pnpm exec wrangler r2 bucket lifecycle set "$BUCKET" \
+            --file "$GITHUB_WORKSPACE/.artemis-platform/backups/r2-lifecycle.json" --force
+
+      - name: Export the database
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_BACKUP_TOKEN }}
+          DATABASE: ${{ steps.names.outputs.database }}
+          STAMP: ${{ steps.names.outputs.stamp }}
+        run: |
+          dump="$RUNNER_TEMP/${DATABASE}-${STAMP}.sql"
+          pnpm exec wrangler d1 export "$DATABASE" --remote --output "$dump" \
+            --skip-confirmation
+          # An empty dump uploading over a good series is the quiet failure this guards:
+          # wrangler can exit 0 having written nothing useful.
+          if [ ! -s "$dump" ]; then
+            echo "::error::export produced an empty file — refusing to upload"
+            exit 1
+          fi
+          echo "exported $(wc -c < "$dump") bytes"
+
+      - name: Upload the dump to R2
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_BACKUP_TOKEN }}
+          DATABASE: ${{ steps.names.outputs.database }}
+          BUCKET: ${{ steps.names.outputs.bucket }}
+          STAMP: ${{ steps.names.outputs.stamp }}
+          DAY: ${{ steps.names.outputs.day }}
+        run: |
+          dump="$RUNNER_TEMP/${DATABASE}-${STAMP}.sql"
+          object="${DATABASE}-${STAMP}.sql"
+          pnpm exec wrangler r2 object put "${BUCKET}/daily/${object}" \
+            --file "$dump" --remote
+          # On the 1st, write the same dump a second time under the longer-lived prefix.
+          if [ "$DAY" = "01" ]; then
+            pnpm exec wrangler r2 object put "${BUCKET}/monthly/${object}" \
+              --file "$dump" --remote
+          fi

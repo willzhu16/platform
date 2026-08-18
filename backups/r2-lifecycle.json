@@ -1,0 +1,16 @@
+{
+  "Rules": [
+    {
+      "ID": "expire-daily-exports",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "daily/" },
+      "Expiration": { "Days": 30 }
+    },
+    {
+      "ID": "expire-monthly-exports",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "monthly/" },
+      "Expiration": { "Days": 190 }
+    }
+  ]
+}

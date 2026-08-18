@@ -46,12 +46,23 @@ availability, and the **Cloudflare dashboard** for built-in request/latency grap
 
 ## Backups & restore (spec 08 §4b)
 
-Recovery point objective at solo scale: **24h**. If this project stores source-of-truth
-data in D1, a nightly `wrangler d1 export` → the `backups-{{ project_name }}` R2 bucket keeps
-30 daily + 6 monthly copies. R2 buckets holding user data get object versioning on; KV is
-treated as rebuildable cache (say otherwise in `THREAT.md` if it isn't). **A backup that has
-not been restored is a rumor** — the quarterly cadence restores the latest export into a
-scratch database and runs the smoke test.
+Recovery point objective at solo scale: **24h**.
+
+{% if 'd1' in bindings %}This project has a D1 database, so `.github/workflows/backup.yml`
+**ships enabled**: every night it exports the database and writes the dump to the
+`backups-{{ project_name }}` R2 bucket, under `daily/` (and `monthly/` on the 1st). It needs
+one repo secret — `CLOUDFLARE_BACKUP_TOKEN`, a narrow token with D1 read and R2 write only.
+Do not reuse the deploy token: a nightly unattended job must not be able to deploy.
+
+Retention is enforced by R2 lifecycle rules, not by code — 30 days for `daily/`, 190 for
+`monthly/`. The workflow only ever writes; it never deletes.{% else %}This project has no
+database, so no backup workflow is generated and no bucket is provisioned. Add `d1` to the
+bindings and re-render if that changes.{% endif %}
+
+R2 buckets holding user data get object versioning on; KV is treated as rebuildable cache
+(say otherwise in `THREAT.md` if it isn't). **A backup that has not been restored is a
+rumor** — the quarterly cadence restores the latest export into a scratch database and runs
+the smoke test. Steps are in platform's `backups/README.md`.
 
 ## Out-of-band setup (human, once per project)
 

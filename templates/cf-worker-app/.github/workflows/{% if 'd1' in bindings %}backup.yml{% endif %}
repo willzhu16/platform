@@ -1,0 +1,24 @@
+name: backup
+
+# Nightly D1 backup (spec 08 §4b). This file is rendered ONLY for projects that
+# answered `d1` to the bindings question — a project without a database provisions
+# nothing and has no bucket.
+#
+# Requires the repo secret CLOUDFLARE_BACKUP_TOKEN: a narrow token with D1 read and
+# R2 write only. Do NOT reuse the deploy token here.
+#
+# The database and bucket default to this repo's name (backups-<repo>), which is what
+# wrangler.jsonc names the database, so no inputs are needed.
+
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup: # job id MUST be `backup` — it prefixes the check name
+    uses: willzhu16/platform/.github/workflows/backup-d1.yml@v1
+    secrets: inherit
