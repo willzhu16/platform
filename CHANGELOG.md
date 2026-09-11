@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.7.1](https://github.com/willzhu16/platform/compare/v1.7.0...v1.7.1) (2026-09-11)
+
+
+### Bug Fixes
+
+* **scripts:** pin a concrete template ref so copier update works ([d612f0f](https://github.com/willzhu16/platform/commit/d612f0f825c9864a77b40a5e44e3d82e7af72b39))
+* **scripts:** pin a concrete template ref so copier update works ([b21397e](https://github.com/willzhu16/platform/commit/b21397e8f078832aaaf4d324065672c4f795fe09))
+
 ## [1.7.0](https://github.com/willzhu16/platform/compare/v1.6.0...v1.7.0) (2026-09-11)
 
 
