@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0](https://github.com/willzhu16/platform/compare/v1.7.1...v1.8.0) (2026-09-11)
+
+
+### Features
+
+* let bot PRs run their own checks via an optional AUTOMATION_TOKEN ([#36](https://github.com/willzhu16/platform/issues/36)) ([0677d7a](https://github.com/willzhu16/platform/commit/0677d7a092ab372715c0f6532fd36a4fba472408))
+
 ## [1.7.1](https://github.com/willzhu16/platform/compare/v1.7.0...v1.7.1) (2026-09-11)
 
 
