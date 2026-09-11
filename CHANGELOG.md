@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.7.0](https://github.com/willzhu16/platform/compare/v1.6.0...v1.7.0) (2026-09-11)
+
+
+### Features
+
+* **athena-check:** add an advisory instruction-drift check on PRs ([a38829f](https://github.com/willzhu16/platform/commit/a38829ff776272800dddbb76714b5629b6fcac39))
+* **backups:** add nightly D1 backup with service-enforced retention ([abcf89a](https://github.com/willzhu16/platform/commit/abcf89a9ae33cd7e3386d36f59a5600cb2c8fc62))
+* **backups:** add nightly D1 backup with service-enforced retention ([6839925](https://github.com/willzhu16/platform/commit/6839925199b1c7e8014fd6852cb775dea3ae6a5c))
+* enforce coverage, smoke-check deploys, and add an agent entry point ([c85d4e7](https://github.com/willzhu16/platform/commit/c85d4e7ef889304cef09cfe96f9501a761c87558))
+* **release:** smoke-check the deployed version before going green ([7e74915](https://github.com/willzhu16/platform/commit/7e74915f580f7835327aecaa8806fe962885a620))
+* **templates:** enforce a coverage floor in both templates ([81a20ac](https://github.com/willzhu16/platform/commit/81a20aca01f61db29e5de3e7b84f31941fedf4a3))
+* **templates:** ratchet the coverage floor to the measured numbers ([0a9a0b8](https://github.com/willzhu16/platform/commit/0a9a0b880315406aba76bc071f86e6f5a87d6b73))
+
+
+### Bug Fixes
+
+* **security:** stop flagging literal shell=True commands ([bc70b92](https://github.com/willzhu16/platform/commit/bc70b92bc2ff1d30e9f66e7d8228ce55ec7d52b7))
+* **security:** stop flagging literal shell=True commands ([ef170be](https://github.com/willzhu16/platform/commit/ef170befe3aceeac855422af88fdd6d9aed6aae9))
+
 ## [1.6.0](https://github.com/willzhu16/platform/compare/v1.5.1...v1.6.0) (2026-08-18)
 
 
