@@ -123,6 +123,29 @@ echo '== workflow invariants'
 
 # Property, not instance: athena-sync.yml shipped without a permissions block, so assert
 # the rule for EVERY reusable workflow — including the next one someone adds.
+# Property, not instance: `selftest-complete` is the only check the ruleset requires, so a
+# job missing from its `needs` is silently ungated and can fail a PR green.
+check 'every selftest job is gated by selftest-complete'   ''   "$(python3 - "$PLATFORM_ROOT" <<'PY' 2>/dev/null
+import sys, yaml
+doc = yaml.safe_load(open(sys.argv[1] + "/.github/workflows/selftest.yml")) or {}
+jobs = doc.get("jobs", {})
+gated = set(jobs.get("selftest-complete", {}).get("needs", []))
+print(",".join(sorted(j for j in jobs if j != "selftest-complete" and j not in gated)))
+PY
+)"
+
+# Regression: a `paths:` filter here meant a docs-only PR started no jobs at all, so a
+# required check could never report and the PR would wait on it forever. That is why this
+# repo had no branch protection while every repo it generates has eight required checks.
+check 'selftest has no paths filter, so it reports on every PR'   ''   "$(python3 - "$PLATFORM_ROOT" <<'PY' 2>/dev/null
+import sys, yaml
+doc = yaml.safe_load(open(sys.argv[1] + "/.github/workflows/selftest.yml")) or {}
+triggers = doc.get("on", doc.get(True)) or {}
+pr = triggers.get("pull_request") or {}
+print(",".join(sorted(pr.get("paths", []))))
+PY
+)"
+
 check 'every reusable workflow declares permissions' \
   '' \
   "$(python3 - "$PLATFORM_ROOT" <<'PY' 2>/dev/null
