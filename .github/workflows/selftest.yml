@@ -9,18 +9,19 @@ name: selftest
 # check name is renamed, or the pipeline breaks, this goes red — the interface-freeze
 # tripwire (acceptance test 6).
 
+#
+# NO `paths:` FILTER, deliberately. A path-filtered workflow does not start at all on a PR
+# that misses the filter, so no check reports and a required check waits forever. That is
+# why this repo had no required checks while every repo it generates has eight. Running
+# every job on every PR costs a few minutes of wall clock and nothing else (this repo is
+# public, so Actions minutes are free), and it buys a merge gate on the repo that defines
+# the pipeline for the whole fleet.
+#
+# `selftest-complete` is the ONLY name the ruleset references. Every other job here can be
+# renamed, split or added without touching branch protection.
+
 on:
   pull_request:
-    paths:
-      - '.github/workflows/**'
-      - 'selftest-fixture/**'
-      - 'selftest-fixture-py/**'
-      - 'templates/**'
-      - 'copier.yml'
-      - 'scripts/**'
-      - 'security/**'
-      - 'observability/**'
-      - 'backups/**'
 
 permissions:
   contents: read
@@ -302,3 +303,38 @@ jobs:
             fi
           done
           exit "$rendered"
+
+  # The single required check: one stable name standing in for every job above, so the
+  # ruleset never has to know what this workflow is made of. `if: always()` so it still
+  # reports when a dependency fails, is cancelled or is skipped; the loop below is what
+  # turns any of those into a red gate. `needs` must list every job: one left out is
+  # silently ungated, which is the failure this job exists to prevent.
+  selftest-complete:
+    needs:
+      - lint-workflows
+      - lint-scripts
+      - test-scripts
+      - lint-configs
+      - test-semgrep-rules
+      - ci
+      - ci-python
+      - render-cf-worker-app
+      - render-cf-worker-app-minimal
+      - render-py-tool
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fail unless every selftest job succeeded
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "selftest job results: $RESULTS"
+          failed=0
+          for result in $RESULTS; do
+            if [ "$result" != 'success' ]; then
+              echo "::error::a selftest job reported '$result' - see the failing job above"
+              failed=1
+            fi
+          done
+          exit "$failed"
