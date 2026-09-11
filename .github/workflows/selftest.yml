@@ -195,6 +195,65 @@ jobs:
           pnpm test
           pnpm build
 
+  # The all-features render never exercises the OFF paths. A conditional FILENAME like
+  # `{% if visibility == 'public' %}codeql.yml{% endif %}` renders to an empty name and is
+  # skipped, so a mistake in that expression is invisible until a real project is
+  # generated from the template. This renders the opposite corner — private, no bindings,
+  # no cron, no forms — asserts each conditional file is absent, and runs the gates,
+  # because a Worker with no bindings is a different wrangler.jsonc and a different index.ts.
+  render-cf-worker-app-minimal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # copier renders from the git HEAD, not the working tree
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+      - name: Render the template (private, every feature off)
+        run: |
+          cat > "$RUNNER_TEMP/answers-minimal.yml" <<'EOF'
+          template: cf-worker-app
+          project_name: render-check-minimal
+          description: selftest render of cf-worker-app with every option off
+          visibility: private
+          bindings: []
+          needs_scheduled_jobs: false
+          public_forms: false
+          EOF
+          uvx --from copier copier copy --defaults --vcs-ref HEAD \
+            --data-file "$RUNNER_TEMP/answers-minimal.yml" . render-min
+      - name: Assert every conditional file is absent
+        run: |
+          rendered=0
+          for path in \
+            .github/workflows/codeql.yml \
+            .github/workflows/backup.yml \
+            src/lib/turnstile.ts \
+            tests/turnstile.test.ts \
+            LICENSE
+          do
+            if [ -e "render-min/$path" ]; then
+              echo "::error::$path rendered even though its condition is false"
+              rendered=1
+            fi
+          done
+          exit "$rendered"
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+        with:
+          package_json_file: render-min/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run the rendered project's gates
+        working-directory: render-min
+        # Un-frozen install for the same reason as the all-features render: templates
+        # ship no lockfile.
+        run: |
+          pnpm install
+          pnpm typecheck
+          pnpm test
+          pnpm build
+
   render-py-tool:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -223,3 +282,23 @@ jobs:
           uv run ruff format --check .
           uv run pyright
           uv run pytest -q
+      # py-tool's only visibility-dependent output is which files exist, so a private
+      # render needs the absence assertion but not a second full gate run.
+      - name: Render privately and assert the public-only files are absent
+        run: |
+          cat > "$RUNNER_TEMP/answers-private.yml" <<'EOF'
+          template: py-tool
+          project_name: render-check-py-private
+          description: selftest render of py-tool as a private repo
+          visibility: private
+          EOF
+          uvx --from copier copier copy --defaults --vcs-ref HEAD \
+            --data-file "$RUNNER_TEMP/answers-private.yml" . render-out-private
+          rendered=0
+          for path in .github/workflows/codeql.yml LICENSE; do
+            if [ -e "render-out-private/$path" ]; then
+              echo "::error::$path rendered even though the repo is private"
+              rendered=1
+            fi
+          done
+          exit "$rendered"
