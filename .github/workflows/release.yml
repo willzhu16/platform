@@ -7,6 +7,11 @@ name: release-reusable
 # merges → tag vX.Y.Z → this workflow builds ONCE from the tag, attaches the artifact
 # to the GitHub Release, and deploys that artifact — never a branch tip.
 #
+# The deploy job then smoke-checks the live worker: /healthz must report the tag it just
+# deployed, so a green `release / deploy` means the new version is actually serving and
+# not merely that wrangler exited 0. It detects, it does not protect: a failed smoke
+# leaves the bad version live, so roll back via the workflow_dispatch path above.
+#
 # Callers trigger on `push: tags: v*` and also expose `workflow_dispatch` with a `tag`
 # input forwarded here, so the rollback runbook's
 # `gh workflow run release.yml --ref vX.Y.Z -f tag=vX.Y.Z` redeploys an exact earlier
@@ -37,6 +42,9 @@ on:
       deploy-entry:
         type: string
         default: 'dist/index.js' # the built bundle `deploy: true` callers ship
+      smoke-url:
+        type: string
+        default: '' # empty: discover the workers.dev URL from `wrangler deploy` output
       publish-command:
         type: string
         default: '' # extension point: runs after the artifact upload when non-empty
@@ -170,11 +178,41 @@ jobs:
           name: release-dist
           path: ${{ inputs.working-directory }}/dist
       - name: Deploy the built artifact
+        id: deploy
         working-directory: ${{ inputs.working-directory }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           # Deploy exactly what `build` produced (build-once): the bundled entry
           # point, no re-bundling. PROJECT_VERSION pins /healthz to the tag.
+          # `shell: bash` runs with pipefail, so tee cannot mask a failed deploy.
           pnpm exec wrangler deploy "${{ inputs.deploy-entry }}" --no-bundle \
-            --var "PROJECT_VERSION:${{ needs.build.outputs.tag }}"
+            --var "PROJECT_VERSION:${{ needs.build.outputs.tag }}" | tee deploy.log
+          url="$(grep -Eo 'https://[a-zA-Z0-9-]+[^ ]*\.workers\.dev' deploy.log | head -1)"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+      - name: Smoke check the deployed version
+        # A zero exit from wrangler means the API accepted the upload, not that the worker
+        # serves traffic. /healthz returns PROJECT_VERSION, which the step above pinned to
+        # the tag, so matching it proves THIS build is live rather than merely that
+        # something responds. Retried because propagation takes seconds, not milliseconds.
+        env:
+          TAG: ${{ needs.build.outputs.tag }}
+          SMOKE_URL: ${{ inputs.smoke-url }}
+          DISCOVERED_URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          base="${SMOKE_URL:-$DISCOVERED_URL}"
+          if [ -z "$base" ]; then
+            echo "::error::no deploy URL found; set the smoke-url input (custom domain, or workers.dev disabled)"
+            exit 1
+          fi
+          for attempt in 1 2 3 4 5; do
+            body="$(curl -fsS --max-time 10 "${base%/}/healthz" || true)"
+            if [ "$(printf '%s' "$body" | jq -r '.version // empty')" = "$TAG" ]; then
+              echo "smoke OK: /healthz reports $TAG"
+              exit 0
+            fi
+            echo "attempt ${attempt}: /healthz has not reported ${TAG} yet (got: ${body:-no response})"
+            if [ "$attempt" -lt 5 ]; then sleep "$((attempt * 5))"; fi
+          done
+          echo "::error::${base%/}/healthz never reported ${TAG}. That version is live but unverified. Roll back with: gh workflow run release.yml --ref <previous tag> -f tag=<previous tag>"
+          exit 1

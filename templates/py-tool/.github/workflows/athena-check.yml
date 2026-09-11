@@ -1,0 +1,16 @@
+name: athena-check
+
+on:
+  pull_request:
+
+# One live run per branch: a superseded push cancels the previous run's job.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  athena: # job id MUST be `athena` — check-name contract (`athena / doctor`)
+    uses: willzhu16/platform/.github/workflows/athena-check.yml@v1

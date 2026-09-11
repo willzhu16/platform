@@ -2,10 +2,15 @@ name: preview-reusable
 
 # Reusable per-PR preview deploy (spec 07 §2.1; D-06: local → preview → production, no
 # staging). Callers name their job `preview`, so the check surfaces as
-# `preview / deploy` — required in rulesets only for repos that deploy. Uploads a
-# preview version of the Worker (`wrangler versions upload` — the identical runtime as
-# production) and maintains ONE sticky PR comment with the preview URL; pushing new
-# commits updates that comment, never adds another.
+# `preview / deploy`. Uploads a preview version of the Worker (`wrangler versions
+# upload` — the identical runtime as production) and maintains ONE sticky PR comment
+# with the preview URL; pushing new commits updates that comment, never adds another.
+#
+# That check is ADVISORY, and rulesets/main.json deliberately does not require it: a
+# preview deploy depends on Cloudflare and on the network, so it fails for reasons that
+# have nothing to do with the diff, and a flaky required check only teaches reviewers to
+# ignore red. A failed preview shows on the PR but does not block the merge. To change
+# that, add `preview / deploy` to the ruleset in every deploying repo.
 #
 # Secrets: the job runs in the CALLER's `preview` environment; callers use
 # `secrets: inherit` so the environment-scoped CLOUDFLARE_API_TOKEN resolves there.
