@@ -1,0 +1,78 @@
+name: athena-check-reusable
+
+# Advisory instruction-drift check, the per-PR companion to athena-sync.yml. The sync job
+# only runs weekly, so a hand-edited CLAUDE.md merges green and sits wrong in main for up
+# to six days. This runs the same doctor on every PR and fails immediately instead.
+#
+# ADVISORY BY DESIGN: this check is not listed in rulesets/main.json, so it reports red
+# without blocking a merge. Promoting it to a required check means editing the ruleset in
+# every consumer repo, which is a fleet-wide change, not an edit here.
+#
+# Expect it to go red for every repo between an athena release and that repo's next sync:
+# doctor compares against athena@v1, so "athena moved on" and "somebody hand-edited this"
+# look identical to it. That is not noise to suppress — it is the signal that a sync PR is
+# waiting to be merged, which is exactly the thing that currently goes unnoticed.
+#
+# Callers name their job `athena`, so the check surfaces as `athena / doctor`. Only pull
+# requests: drift on main is already the weekly sync job's business.
+
+on:
+  workflow_call:
+    inputs:
+      athena-ref:
+        type: string
+        default: 'v1' # the moving athena major tag (D-18)
+      node-version:
+        type: string
+        default: '24'
+
+# Read-only, unlike athena-sync: this job reports, it never writes a branch or a PR.
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  doctor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/athena
+          ref: ${{ inputs.athena-ref }}
+          path: .athena-src
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+        with:
+          # Resolve the pnpm version from athena's packageManager field — the caller repo
+          # may not even be a Node project (py-tool).
+          package_json_file: .athena-src/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: pnpm
+          cache-dependency-path: .athena-src/pnpm-lock.yaml
+      - name: Install athena
+        working-directory: .athena-src
+        run: pnpm install --frozen-lockfile
+      - name: doctor
+        working-directory: .athena-src
+        run: pnpm doctor "$GITHUB_WORKSPACE"
+      - name: How to fix drift
+        if: failure()
+        run: |
+          {
+            echo "### Instruction files have drifted"
+            echo ""
+            echo "CLAUDE.md / AGENTS.md no longer match what athena would compile."
+            echo "They are build output — never hand-edit them."
+            echo ""
+            echo "- A rule for this project only: edit \`.athena/project.md\`."
+            echo "- A rule for every project: edit the layer in \`athena\` and open a PR there."
+            echo "- Then recompile: \`pnpm compile <this repo>\` from an athena checkout."
+            echo ""
+            echo "If athena simply moved on, merge the open athena-sync PR instead."
+          } >> "$GITHUB_STEP_SUMMARY"
