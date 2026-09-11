@@ -12,3 +12,6 @@ permissions:
 jobs:
   sync:
     uses: willzhu16/platform/.github/workflows/athena-sync.yml@v1
+    # Forwards AUTOMATION_TOKEN when this repo has it, so the sync PR opens with its
+    # checks already running instead of needing a close and reopen.
+    secrets: inherit

@@ -22,6 +22,13 @@ on:
       node-version:
         type: string
         default: '24'
+    secrets:
+      AUTOMATION_TOKEN:
+        # Optional. A PAT or App token, so the sync PR opened below arrives with its checks
+        # already running. Without it the PR is created by GITHUB_TOKEN, whose events
+        # GitHub never uses to trigger workflows, and a human has to close and reopen the
+        # PR before anything runs. Callers pass it with `secrets: inherit`.
+        required: false
 
 # Declared explicitly like every sibling reusable workflow: without this the job silently
 # inherits whatever the caller granted, so there is no least-privilege floor. A called
@@ -40,6 +47,10 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Same token the PR is opened with, so the branch push and the PR come from one
+          # identity instead of two.
+          token: ${{ secrets.AUTOMATION_TOKEN || github.token }}
       - uses: actions/checkout@v4
         with:
           repository: ${{ github.repository_owner }}/athena
@@ -66,7 +77,7 @@ jobs:
         run: pnpm doctor "$GITHUB_WORKSPACE"
       - name: Open or update the sync PR on drift
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.AUTOMATION_TOKEN || github.token }}
           ATHENA_REF: ${{ inputs.athena-ref }}
         run: |
           rm -rf .athena-src
@@ -86,5 +97,5 @@ jobs:
               --body "$(printf '%s\n\n%s\n%s' \
                 "Weekly athena sync: the compiled instruction files drifted from athena@${ATHENA_REF} — either athena's layers changed, or a file was hand-edited (never do that; edit .athena/project.md instead). Review the diff and merge to converge." \
                 '> [!NOTE]' \
-                '> CI will not start on this PR automatically (it was opened by GITHUB_TOKEN, which cannot trigger workflows). Close and reopen the PR to run the checks.')"
+                '> If this PR shows no checks it was opened with GITHUB_TOKEN, whose events cannot trigger workflows. Close and reopen it to run them, and set the AUTOMATION_TOKEN secret to stop it recurring.')"
           fi

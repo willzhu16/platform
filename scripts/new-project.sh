@@ -136,6 +136,20 @@ gh api -X PUT "repos/${OWNER}/${NAME}/actions/permissions/workflow" \
   || fail 'setting Actions workflow permissions failed'
 ok 'Actions may create PRs (athena-sync drift PRs)'
 
+# Bot-opened PRs (release-please, athena-sync) carry no checks when created with the
+# default GITHUB_TOKEN, because GitHub never triggers workflows from that token's events.
+# Under a ruleset requiring any check, such a PR cannot merge until a human closes and
+# reopens it. This secret is what lets those PRs run their own checks. Optional: without
+# it the repo still works, its bot PRs just need that close and reopen every time.
+if [ -n "${ARTEMIS_AUTOMATION_TOKEN:-}" ]; then
+  gh secret set AUTOMATION_TOKEN --repo "${OWNER}/${NAME}" --body "$ARTEMIS_AUTOMATION_TOKEN" \
+    >/dev/null || fail 'setting AUTOMATION_TOKEN failed'
+  ok 'AUTOMATION_TOKEN set (bot PRs will run their own checks)'
+else
+  printf '  \033[33m!\033[0m ARTEMIS_AUTOMATION_TOKEN not in the environment; bot PRs here '
+  printf 'will need a close and reopen to run CI\n'
+fi
+
 # ---- 6. Apply the main ruleset ---------------------------------------------
 step '6. Apply main ruleset'
 if gh api "repos/${OWNER}/${NAME}/rulesets" --jq '.[].name' 2>/dev/null | grep -qx main; then
