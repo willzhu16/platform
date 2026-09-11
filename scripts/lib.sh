@@ -23,6 +23,18 @@ build_answers_file() {
   fi
 }
 
+# Print the newest plain vX.Y.Z tag from a newline-separated list on stdin, or nothing.
+# A generated project must record a CONCRETE release as its template ref: the moving major
+# tags (`v1`) are force-moved onto every release, so a project whose `_commit` is `v1`
+# later has copier compare the template against itself and report "Keeping template
+# version 1" while applying nothing (verified with copier 9.16 on canary-worker
+# 2026-09-11). Component-prefixed leftovers like `platform-v1.1.0` are ignored too.
+# Never returns non-zero: grep exits 1 on no match, and under `set -euo pipefail` that
+# would abort the caller instead of letting it fall back to an unpinned generate.
+newest_release_tag() {
+  { grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true; } | sort -V | tail -1
+}
+
 # Print $1's dotted version, or nothing if it has none. Never returns non-zero: under
 # `set -euo pipefail` a bare assignment whose pipeline fails aborts the caller, and grep
 # exits 1 when a tool prints no dotted version to stdout (gitleaks, age). The self-check

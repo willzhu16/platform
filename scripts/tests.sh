@@ -105,6 +105,20 @@ check 'a dotted version is extracted' \
   '2.31.7' \
   "$(tool_version withversion)"
 
+# Regression: new-project.sh recorded `_commit: v1` in every generated repo, so
+# `copier update` compared the template against itself and applied nothing.
+check 'newest_release_tag picks the highest concrete release' \
+  'v1.10.0' \
+  "$(printf 'v1.7.0\nv1\nv1.10.0\nplatform-v1.1.0\nv1.9.0\n' | newest_release_tag)"
+
+check 'newest_release_tag rejects moving major tags' \
+  '' \
+  "$(printf 'v1\nv2\n' | newest_release_tag)"
+
+check 'newest_release_tag survives an empty tag list under pipefail' \
+  'REACHED:' \
+  "$(set -euo pipefail; t="$(printf '' | newest_release_tag)"; printf 'REACHED:%s' "$t")"
+
 echo '== workflow invariants'
 
 # Property, not instance: athena-sync.yml shipped without a permissions block, so assert

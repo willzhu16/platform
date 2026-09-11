@@ -71,9 +71,25 @@ else
   DATA_FILE="$(mktemp)"
   trap 'rm -f "$DATA_FILE"' EXIT
   build_answers_file > "$DATA_FILE" # scripts/lib.sh — tested by scripts/tests.sh
-  copier copy --defaults --data-file "$DATA_FILE" "$PLATFORM_SRC" "$NAME" \
+  # Pin a concrete release, never the moving `v1`. copier writes whatever ref it used into
+  # .copier-answers.yml as `_commit`, and a `_commit` that keeps moving makes a later
+  # `copier update` diff the template against itself, so the monthly sweep silently
+  # applies nothing. Skipped when PLATFORM_SRC is overridden (a local path, for testing).
+  TEMPLATE_REF=''
+  if [ "$PLATFORM_SRC" = "gh:${PLATFORM_REPO}" ]; then
+    TEMPLATE_REF="$(gh api "repos/${PLATFORM_REPO}/tags" --paginate --jq '.[].name' 2>/dev/null \
+      | newest_release_tag)"
+  fi
+  REF_ARGS=()
+  if [ -n "$TEMPLATE_REF" ]; then
+    REF_ARGS=(--vcs-ref "$TEMPLATE_REF")
+  else
+    printf '  \033[33m!\033[0m no concrete release tag found; generating unpinned, so '
+    printf '`copier update` will not work here until _commit is set by hand\n'
+  fi
+  copier copy --defaults "${REF_ARGS[@]}" --data-file "$DATA_FILE" "$PLATFORM_SRC" "$NAME" \
     || fail 'copier generation failed' 'check the template answers above'
-  ok "generated ./$NAME from $TEMPLATE"
+  ok "generated ./$NAME from $TEMPLATE${TEMPLATE_REF:+ at $TEMPLATE_REF}"
 fi
 
 cd "$NAME"
