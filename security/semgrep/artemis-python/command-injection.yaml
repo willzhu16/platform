@@ -11,6 +11,9 @@ rules:
       cwe: 'CWE-78: Improper Neutralization of Special Elements used in an OS Command'
       references:
         - https://owasp.org/www-community/attacks/Command_Injection
+    # shell=True is only a risk when the command is built from something. A hardcoded
+    # string carries no injection surface, and flagging it trains people to ignore the
+    # rule — the same literal exclusion the JS rule uses.
     patterns:
       - pattern-either:
           - pattern: subprocess.call(..., shell=True, ...)
@@ -18,6 +21,11 @@ rules:
           - pattern: subprocess.Popen(..., shell=True, ...)
           - pattern: subprocess.check_output(..., shell=True, ...)
           - pattern: subprocess.check_call(..., shell=True, ...)
+      - pattern-not: subprocess.call('...', ...)
+      - pattern-not: subprocess.run('...', ...)
+      - pattern-not: subprocess.Popen('...', ...)
+      - pattern-not: subprocess.check_output('...', ...)
+      - pattern-not: subprocess.check_call('...', ...)
 
   - id: artemis-py-eval-exec-nonliteral
     message: >-
