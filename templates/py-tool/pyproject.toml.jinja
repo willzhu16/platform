@@ -24,7 +24,10 @@ build-backend = "hatchling.build"
 packages = ["src/{{ project_name.replace('-', '_') }}"]
 
 [tool.pytest.ini_options]
-addopts = "--cov={{ project_name.replace('-', '_') }}"
+# --cov-fail-under turns coverage into a gate instead of a report nobody reads. Opening
+# floor, set below current coverage on purpose. Raise it as the suite grows; never lower
+# it to turn a red build green.
+addopts = "--cov={{ project_name.replace('-', '_') }} --cov-fail-under=60"
 
 [tool.ruff]
 line-length = 100
