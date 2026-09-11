@@ -10,10 +10,10 @@ export default defineConfig({
       include: ['src/**/*.ts'],
       // Opening floor, set below current coverage on purpose. Raise it as the suite grows.
       // Never lower it to turn a red build green — add the missing test instead.
-      // Branches opens lower than the rest: the request router has branches no shipped
-      // test reaches yet, and the least informative metric should not be the one that
-      // blocks. Raise all four together once selftest reports the real numbers.
-      thresholds: { lines: 60, functions: 60, statements: 60, branches: 40 },
+      // Measured on the rendered template by selftest: 76.27 lines/statements, 71.42
+      // functions, 52.63 branches. These sit a few points under that, so ordinary churn
+      // does not go red but a real regression does. Ratchet up as the suite grows.
+      thresholds: { lines: 70, functions: 65, statements: 70, branches: 45 },
     },
   },
 });
