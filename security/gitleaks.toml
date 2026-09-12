@@ -2,7 +2,7 @@
 # Extends the gitleaks default ruleset (broad, well-maintained coverage) with custom
 # rules for the credential shapes this environment issues: Cloudflare API tokens, age
 # private keys, GitHub fine-grained PATs, and ntfy topic URLs. A finding is a hard fail
-# — rotate first, then purge history (security/runbooks/leak.md, spec 06).
+# — rotate first, then purge history (security/README.md).
 
 title = "Artemis platform gitleaks config"
 
@@ -29,6 +29,6 @@ keywords = ["cloudflare", "cf_api", "cf-api"]
 
 [[rules]]
 id = "artemis-ntfy-topic-url"
-description = "ntfy topic URL (anyone holding it can push alerts to the owner's phone — treat as a secret, spec 08)"
+description = "ntfy topic URL (anyone holding it can push alerts to subscribers — treat as a secret, spec 08)"
 regex = '''https?://ntfy\.sh/[A-Za-z0-9_-]{8,}'''
 keywords = ["ntfy.sh/"]

@@ -25,7 +25,8 @@ service to run; the deploy target is GitHub itself.
     `preview.yml` — per-PR `wrangler versions upload` + sticky comment (`preview / deploy`).
   - `codeql.yml` — single `analyze` job (deliberately not a matrix; keeps the frozen
     `codeql / analyze` name). Templates wire it only for public repos.
-  - Repo-local: `selftest.yml` (the PR gate for this repo — actionlint + shellcheck +
+  - Repo-local: `selftest.yml` (runs on every PR with a `selftest-complete` aggregate gate —
+    actionlint + shellcheck +
     runs ci/ci-python against the fixtures + copier-renders both templates and runs their
     gates), `release-platform.yml` (release-please), `update-major-tag.yml` (force-moves
     `v1` onto a published `vX.Y.Z`; regex-guarded), `cadence.yml` (scheduled maintenance
@@ -69,15 +70,15 @@ service to run; the deploy target is GitHub itself.
   `release`, `preview`, `codeql`, `sync`), the check names in `rulesets/main.json`, the
   `lint`/`typecheck`/`test` script contract, reusable-workflow input names, and plain
   `vX.Y.Z` tags (the moving `v1` depends on the shape).
-- GITHUB_TOKEN suppression is worked around in three places (release-platform.yml and the
-  template release-please.yml dispatch the next workflow explicitly; athena-sync PRs need
-  a human close/reopen to start CI). Don't simplify these away.
+- Optional `AUTOMATION_TOKEN` (PAT/App token) makes bot-created PRs trigger CI. Without
+  it, GITHUB_TOKEN suppression still requires a human close/reopen. Release workflows
+  explicitly dispatch the next workflow; do not simplify those dispatches away.
 - release-please owns versioning (`.release-please-manifest.json`); the stray
   `platform-v1.1.0` tag is a harmless artifact of an old config — ignore it.
 - Templates ship no lockfiles by design; `new-project.sh` generates them (CI installs are
   `--frozen`, so a missing lockfile means a red first PR).
-- `.sops.yaml` in the template has a placeholder age recipient; `security/age.pub` and the
-  leak runbook it references are delivered by a later spec and don't exist yet.
+- `.sops.yaml` has a placeholder recipient: configure a project-specific age public key
+  before encrypting anything. Leak response is documented in `security/README.md`.
 - Each template contains its own thin `security.yml` *caller* — don't confuse those with
   the reusable `security.yml` at this repo's root.
 - `.gitattributes` forces LF; keep it that way (athena's doctor is byte-exact downstream).

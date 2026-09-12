@@ -21,4 +21,5 @@ permissions:
 jobs:
   backup: # job id MUST be `backup` — it prefixes the check name
     uses: willzhu16/platform/.github/workflows/backup-d1.yml@v1
-    secrets: inherit
+    secrets:
+      CLOUDFLARE_BACKUP_TOKEN: ${{ secrets.CLOUDFLARE_BACKUP_TOKEN }}

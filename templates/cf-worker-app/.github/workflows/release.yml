@@ -20,4 +20,3 @@ jobs:
     with:
       tag: ${{ inputs.tag || '' }}
       deploy: true
-    secrets: inherit

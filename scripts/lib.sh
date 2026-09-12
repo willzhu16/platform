@@ -27,8 +27,7 @@ build_answers_file() {
 # A generated project must record a CONCRETE release as its template ref: the moving major
 # tags (`v1`) are force-moved onto every release, so a project whose `_commit` is `v1`
 # later has copier compare the template against itself and report "Keeping template
-# version 1" while applying nothing (verified with copier 9.16 on canary-worker
-# 2026-09-11). Component-prefixed leftovers like `platform-v1.1.0` are ignored too.
+# version 1" while applying nothing. Component-prefixed tags are ignored too.
 # Never returns non-zero: grep exits 1 on no match, and under `set -euo pipefail` that
 # would abort the caller instead of letting it fall back to an unpinned generate.
 newest_release_tag() {

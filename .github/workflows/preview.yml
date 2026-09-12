@@ -12,8 +12,8 @@ name: preview-reusable
 # ignore red. A failed preview shows on the PR but does not block the merge. To change
 # that, add `preview / deploy` to the ruleset in every deploying repo.
 #
-# Secrets: the job runs in the CALLER's `preview` environment; callers use
-# `secrets: inherit` so the environment-scoped CLOUDFLARE_API_TOKEN resolves there.
+# Secrets: the job runs in the CALLER's `preview` environment, which supplies
+# CLOUDFLARE_API_TOKEN. Callers do not need to forward repository secrets.
 #
 # Caveat: `versions upload` needs the Worker to exist — the first production deploy
 # (or a manual `wrangler deploy`) creates it; preview runs before that fail.
@@ -50,13 +50,13 @@ jobs:
       group: preview-deploy-${{ github.event.pull_request.number }}
       cancel-in-progress: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
         with:
           # Resolve the pnpm version from the project's packageManager field — the
           # default looks at the caller repo root, which may have no package.json.
           package_json_file: ${{ inputs.working-directory }}/package.json
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ inputs.node-version }}
           cache: pnpm

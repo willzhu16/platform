@@ -1,9 +1,8 @@
-# SOPS encryption rules (spec 06). Files under secrets/ are encrypted to the shared age
-# key before they are committed — safe to keep in a public repo.
+# SOPS encryption rules. Encrypt files under secrets/ before committing them.
 #
-# TODO (bootstrap, spec 06): replace the placeholder recipient below with the real age
-# public key from platform/security/age.pub. Until then, do NOT commit anything under
-# secrets/ — the gitleaks gate will catch an unencrypted secrets/*.env anyway.
+# Replace the placeholder with this project's age public recipient before use.
+# Until encryption is configured and verified, do not commit files under secrets/.
+# Pattern-based secret scanners cannot prove that a file contains no sensitive values.
 creation_rules:
   - path_regex: secrets/.*\.(env|json|yaml)$
     age: age1PLACEHOLDER0000000000000000000000000000000000000000000000000000

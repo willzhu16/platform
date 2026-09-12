@@ -27,7 +27,7 @@ on:
         # Optional. A PAT or App token, so the sync PR opened below arrives with its checks
         # already running. Without it the PR is created by GITHUB_TOKEN, whose events
         # GitHub never uses to trigger workflows, and a human has to close and reopen the
-        # PR before anything runs. Callers pass it with `secrets: inherit`.
+        # PR before anything runs. Callers pass AUTOMATION_TOKEN by name.
         required: false
 
 # Declared explicitly like every sibling reusable workflow: without this the job silently
@@ -46,12 +46,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           # Same token the PR is opened with, so the branch push and the PR come from one
           # identity instead of two.
           token: ${{ secrets.AUTOMATION_TOKEN || github.token }}
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: ${{ github.repository_owner }}/athena
           ref: ${{ inputs.athena-ref }}
@@ -61,7 +61,7 @@ jobs:
           # Resolve the pnpm version from athena's packageManager field — the caller
           # repo may not even be a Node project (py-tool).
           package_json_file: .athena-src/package.json
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ inputs.node-version }}
           cache: pnpm
