@@ -94,7 +94,7 @@ deletion, and requires linear history.
 - **Never rename a job id or check name.** They are referenced by literal string in every
   repo's ruleset. A rename means that repo can never merge again.
 - **Never hand-edit `CLAUDE.md`, `AGENTS.md` or `.claude/settings.json`.** They are
-  compiled output, stamped with `ATHENA-COMPILED`. Edit `.athena/project.md` for a rule
+  generated output; only the instruction Markdown carries `ATHENA-COMPILED`. Edit `.athena/project.md` for a rule
   that applies to this project, or an athena instruction layer for one that applies to
   every project, then recompile with `pnpm compile <repo>` from an athena checkout. A
   weekly job reverts hand-edits.
@@ -114,5 +114,5 @@ deletion, and requires linear history.
   severity levels, log schema.
 - `.github/workflows/*.yml` each open with a header comment explaining their contract.
   Read that header before changing one.
-- `selftest.yml` gates every change to a workflow or template. There is no way to run
+- `selftest.yml` runs on every PR, including documentation-only changes. There is no way to run
   these pipelines locally.

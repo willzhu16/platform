@@ -21,11 +21,11 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout full history
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
       - name: Fetch shared gitleaks config from platform
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           # Hardcoded on purpose: this file is COPIED into a legacy repo and dispatched
           # there, so every context-derived location (github.workflow_ref, job.workflow_*)
@@ -52,7 +52,7 @@ jobs:
             --report-format json --report-path gitleaks-history-report.json
       - name: Upload report (private artifact)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: gitleaks-history-report
           path: gitleaks-history-report.json

@@ -43,7 +43,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout (full history for diff-scope and push scans)
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
       - name: Resolve platform repo ref
@@ -55,7 +55,7 @@ jobs:
           echo "repository=${{ job.workflow_repository }}" >> "$GITHUB_OUTPUT"
           echo "ref=${{ job.workflow_sha }}" >> "$GITHUB_OUTPUT"
       - name: Fetch shared gitleaks config from platform
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: ${{ steps.platform.outputs.repository }}
           ref: ${{ steps.platform.outputs.ref }}
@@ -72,7 +72,7 @@ jobs:
           tar -xzf "$tarball" gitleaks
           install -m 0755 gitleaks /usr/local/bin/gitleaks
           gitleaks version
-      - name: Scan (PR = diff range; push = full working tree)
+      - name: Scan (PR = diff range; push = Git history)
         run: |
           config=.artemis-platform/security/gitleaks.toml
           if [ "${{ github.event_name }}" = "pull_request" ]; then
@@ -91,7 +91,7 @@ jobs:
             echo "first**, then purge it from git history — never the reverse (public repos"
             echo "are scraped within minutes)."
             echo ""
-            echo "Runbook: \`security/runbooks/leak.md\` (spec 06)."
+            echo "Runbook: \`https://github.com/willzhu16/platform/blob/v1/security/README.md\` (spec 06)."
           } >> "$GITHUB_STEP_SUMMARY"
 
   semgrep:
@@ -99,7 +99,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout code to scan
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Resolve platform repo ref
         id: platform
         # A reusable workflow's `github.*` context is the CALLER's, so read the `job`
@@ -109,23 +109,25 @@ jobs:
           echo "repository=${{ job.workflow_repository }}" >> "$GITHUB_OUTPUT"
           echo "ref=${{ job.workflow_sha }}" >> "$GITHUB_OUTPUT"
       - name: Fetch shared semgrep rules from platform
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: ${{ steps.platform.outputs.repository }}
           ref: ${{ steps.platform.outputs.ref }}
           sparse-checkout: security/semgrep
           sparse-checkout-cone-mode: false
           path: .artemis-platform
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.13'
       - name: Install semgrep (OSS engine)
         run: pip install "semgrep==${SEMGREP_VERSION}"
       - name: Scan
+        env:
+          SEMGREP_CONFIG: ${{ inputs.semgrep-config }}
         run: |
           extra=()
-          if [ -n "${{ inputs.semgrep-config }}" ]; then
-            extra=(--config '${{ inputs.semgrep-config }}')
+          if [ -n "$SEMGREP_CONFIG" ]; then
+            extra=(--config "$SEMGREP_CONFIG")
           fi
           semgrep scan \
             --config .artemis-platform/security/semgrep \
@@ -138,7 +140,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: OSV scan (lockfiles)
         # 'auto' scans the repo recursively (osv-scanner finds every supported lockfile);
         # pass explicit paths via the osv-lockfiles input when auto-detection misfires.

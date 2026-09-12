@@ -1,7 +1,7 @@
 /**
  * Structured logger emitting the handbook log schema (spec 05 §2.3): one JSON object per
  * line, `event` as the primary query key. Never log secrets or the bodies of auth/billing
- * routes. `debug` is intended to be stripped in production builds.
+ * routes. `debug` currently emits like other levels; production filtering is not implemented.
  */
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';

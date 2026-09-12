@@ -1,9 +1,7 @@
 # Domain hygiene checklist (dormant)
 
-**Status: dormant until the first domain purchase** — the hatch fires when D-15 hatch 1
-(custom domains) is reached. No Artemis project owns a domain yet, so nothing here runs
-today. It lives in the repo now (spec 12 §2.6) so the future model executes the whole thing
-in one sitting instead of rediscovering it.
+Apply this checklist when a project adopts a custom domain. It does not require any
+repository to own a domain, and no domain configuration is provisioned automatically.
 
 Run **at domain purchase**, before pointing any DNS at it. All free / registrar-included.
 

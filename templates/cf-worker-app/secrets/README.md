@@ -1,8 +1,8 @@
 # secrets/
 
-Versioned machine config, **encrypted with SOPS + age** before commit (spec 06). Safe in
-a public repo because the values are encrypted; the age private key lives only in Bitwarden
-and on active dev machines.
+Versioned machine config, **encrypted with SOPS + age** before commit. Configure the
+public recipient in `.sops.yaml` first; store its private key in your credential manager,
+outside agent environments. Inspect the encrypted output before publishing it.
 
 ## Convention
 
@@ -15,4 +15,5 @@ and on active dev machines.
 - This store holds **non-production** machine config only. Production deploy credentials
   live in GitHub Environment secrets; runtime third-party keys live in `wrangler secret`.
 - Never commit an unencrypted file here — the `security / gitleaks` gate is the backstop.
-- Agents never read or write under `secrets/` (denied in the T1 permission profile).
+- Agents must not read or write under `secrets/`. T1 denies direct file-tool access;
+  approved scripts still require an isolated environment to enforce that boundary.

@@ -1,6 +1,6 @@
 # Test fixture for command-injection.yaml — run with `semgrep --test`, gated by selftest.
-# Deliberately vulnerable code: never executed, never shipped, and platform does not scan
-# itself. `ruleid:` = a finding is expected on the next line; `ok:` = none is.
+# Deliberately vulnerable scanner test data: never execute or copy into a project.
+# `ruleid:` = a finding is expected on the next line; `ok:` = none is.
 
 import subprocess
 import sys

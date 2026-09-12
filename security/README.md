@@ -8,7 +8,7 @@ from public and private repos alike.
 
 | Check | Tool | Where | Fails when |
 |---|---|---|---|
-| `security / gitleaks` | gitleaks (pinned binary, checksum-verified) | every PR + push to main | a secret pattern is found (PR = diff range, push = full tree) |
+| `security / gitleaks` | gitleaks (pinned binary, checksum-verified) | every PR + push to main | a secret pattern is found (PR = diff range, push = Git history) |
 | `security / semgrep` | Semgrep OSS engine | every PR | code matches a rule in `semgrep/` (or a project's extra `--config`) |
 | `security / osv` | osv-scanner | every PR | a locked dependency has a known OSV advisory |
 | `codeql / analyze` | CodeQL | **public** repos only | data-flow analysis finds a vulnerability |
@@ -54,7 +54,16 @@ pinned and every rule change is a reviewable diff.
 
 ## When a gate fires
 
-A gitleaks hit is a **stop-everything** event: follow the leak-response runbook
-(`security/runbooks/leak.md`, delivered by spec 06) — **rotate the credential first**,
-then purge it from history. Public repos are scraped within minutes; assume compromise
-regardless of whether the purge looks clean.
+A potential secret finding blocks publication until it is investigated. Do not paste the
+value into an issue, PR, chat, or scanner log.
+
+1. If genuine, revoke or rotate the credential at its issuer first and check access logs.
+   A public commit must be treated as exposed even if the branch was quickly deleted.
+2. Remove the value from the current source and replace it with a secret-store reference.
+3. Coordinate any history rewrite with the repository maintainer. Rewriting history is
+   disruptive and does not revoke copies held by forks, caches, or existing clones.
+4. Rescan current files and all fetched Git refs with redaction enabled, then verify the
+   replacement credential works without disclosing it.
+
+The Semgrep fixtures deliberately contain vulnerable examples for scanner regression
+coverage. They are not application code and must never be executed or copied into projects.

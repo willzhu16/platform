@@ -20,4 +20,3 @@ jobs:
     # Draft PRs skip the deploy; nobody visits a preview URL for a draft.
     if: ${{ github.event.pull_request.draft == false }}
     uses: willzhu16/platform/.github/workflows/preview.yml@v1
-    secrets: inherit

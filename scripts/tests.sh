@@ -161,5 +161,66 @@ print(",".join(missing))
 PY
 )"
 
+check 'template workflows forward only named secrets' \
+  '' \
+  "$(python3 - "$PLATFORM_ROOT" <<'PY' 2>/dev/null
+import pathlib, sys, yaml
+root = pathlib.Path(sys.argv[1])
+failures = []
+for path in (root / 'templates').glob('*/.github/workflows/*'):
+    try:
+        document = yaml.safe_load(path.read_text()) or {}
+        for job in document.get('jobs', {}).values():
+            if job.get('secrets') == 'inherit':
+                failures.append(str(path.relative_to(root)))
+    except (OSError, ValueError, TypeError, AttributeError, yaml.YAMLError):
+        failures.append(str(path.relative_to(root)) + ': invalid workflow')
+print(','.join(failures))
+PY
+)"
+
+check 'third-party Actions are pinned and data inputs stay out of shell source' \
+  '' \
+  "$(python3 - "$PLATFORM_ROOT" <<'PY' 2>/dev/null
+import pathlib, re, sys, yaml
+root = pathlib.Path(sys.argv[1])
+failures = []
+paths = list((root / '.github/workflows').glob('*.yml')) + list((root / 'templates').glob('*/.github/workflows/*'))
+for path in paths:
+    try:
+        document = yaml.safe_load(path.read_text()) or {}
+        for job in document.get('jobs', {}).values():
+            for step in job.get('steps', []):
+                ref = step.get('uses', '')
+                if ref and not ref.startswith(('./', 'willzhu16/')) and not re.search(r'@(?:[0-9a-f]{40}|sha256:[0-9a-f]{64})$', ref):
+                    failures.append(path.name + ': unpinned ' + ref)
+                script = step.get('run', '')
+                if re.search(r'\$\{\{\s*inputs\.', script) and script != '${{ inputs.publish-command }}':
+                    failures.append(path.name + ': input interpolated into shell')
+    except (OSError, ValueError, TypeError, AttributeError, yaml.YAMLError):
+        failures.append(path.name + ': invalid workflow')
+print(','.join(failures))
+PY
+)"
+
+check 'Vitest minimum is patched in the fixture and Worker template' \
+  '' \
+  "$(python3 - "$PLATFORM_ROOT" <<'PY' 2>/dev/null
+import json, sys
+root = sys.argv[1]
+failures = []
+for relative in ('selftest-fixture/package.json', 'templates/cf-worker-app/package.json.jinja'):
+    try:
+        dependencies = json.load(open(root + '/' + relative))['devDependencies']
+        for package in ('vitest', '@vitest/coverage-v8'):
+            version = tuple(map(int, dependencies[package].lstrip('^~').split('.')))
+            if version < (4, 1, 11):
+                failures.append(relative + ': ' + package + ' permits vulnerable Vitest')
+    except (OSError, ValueError, KeyError, AttributeError, TypeError):
+        failures.append(relative + ': cannot validate Vitest minimum')
+print(','.join(failures))
+PY
+)"
+
 printf '\n%d passed, %d failed\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]
