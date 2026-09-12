@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.1](https://github.com/willzhu16/platform/compare/v1.8.0...v1.8.1) (2026-09-12)
+
+
+### Bug Fixes
+
+* **security:** harden workflows and patch test dependencies ([#38](https://github.com/willzhu16/platform/issues/38)) ([af9e8d3](https://github.com/willzhu16/platform/commit/af9e8d3bd11d2349b7861afb1e5d83253881206a))
+
 ## [1.8.0](https://github.com/willzhu16/platform/compare/v1.7.1...v1.8.0) (2026-09-11)
 
 
