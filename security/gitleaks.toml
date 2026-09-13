@@ -30,5 +30,15 @@ keywords = ["cloudflare", "cf_api", "cf-api"]
 [[rules]]
 id = "artemis-ntfy-topic-url"
 description = "ntfy topic URL (anyone holding it can push alerts to subscribers — treat as a secret, spec 08)"
-regex = '''https?://ntfy\.sh/[A-Za-z0-9_-]{8,}'''
+# The 8-char floor silently missed short real topics: `ntfy.sh/alerts` is a working
+# topic and a working secret. Lowered to 3 and paired with an allowlist for ntfy's own
+# static pages, which are documentation links rather than topics. Verified against
+# gitleaks 8.30.1 (the pinned version): short and long topics are caught, /docs and /app
+# are not. Covered by security/gitleaks-fixtures and the selftest gate.
+regex = '''https?://ntfy\.sh/[A-Za-z0-9_-]{3,}'''
 keywords = ["ntfy.sh/"]
+
+  [rules.allowlist]
+  description = "ntfy's own static pages are documentation links, not topics"
+  regexTarget = "match"
+  regexes = ['''https?://ntfy\.sh/(docs|app|login|signup|account|settings|pricing|static)(/|$)''']
