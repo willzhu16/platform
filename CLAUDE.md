@@ -41,6 +41,9 @@ service to run; the deploy target is GitHub itself.
 - `selftest-fixture/` (TS) and `selftest-fixture-py/` — minimal real packages the reusable
   CI is tested against. Same script contract as athena (`lint`/`typecheck`/`test`).
 - `scripts/` — `new-project.sh` (creates REAL GitHub repos — never run as a test),
+  `adopt-project.sh` (the retrofit path for a repo that ALREADY exists: à la carte,
+  report-only by default, writes files and never commits/pushes/applies a ruleset — see
+  `handbook/adopting-an-existing-repo.md`),
   `setup-machine.sh` (mutates the machine), `new-project.ps1` (thin WSL wrapper; D-20
   bash-first). Their pure string-building logic lives in `lib.sh`, regression-tested by
   `tests.sh` (`bash scripts/tests.sh`; needs jq + python3/PyYAML — safe to run, touches

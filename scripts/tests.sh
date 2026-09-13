@@ -222,5 +222,52 @@ print(','.join(failures))
 PY
 )"
 
+# --- adopt-project.sh helpers ---------------------------------------------------------
+# The retrofit path writes workflow callers into repos that already have history, so the
+# job ids (the frozen check-name contract) and the owner substitution are the two things
+# that must never quietly drift.
+
+for piece in security ci codeql; do
+  check "caller_workflow ${piece} keeps the frozen job id" \
+    "${piece}" \
+    "$(render_caller_workflow "$piece" someone | python3 -c 'import sys,yaml; print(",".join(yaml.safe_load(sys.stdin)["jobs"]))' 2>/dev/null)"
+
+  check "caller_workflow ${piece} substitutes the owner" \
+    "someone/platform/.github/workflows/${piece}.yml@v1" \
+    "$(render_caller_workflow "$piece" someone | python3 -c 'import sys,yaml; d=yaml.safe_load(sys.stdin); print(list(d["jobs"].values())[0]["uses"])' 2>/dev/null)"
+done
+
+check 'caller_workflow rejects an unknown pipeline' \
+  'rejected' \
+  "$(caller_workflow nonsense >/dev/null 2>&1 && echo accepted || echo rejected)"
+
+# The launch-start review turned on exactly this check: a nightly job pushing to main is
+# what the Artemis ruleset would start rejecting the moment that repo adopted it.
+check 'workflow_pushes_directly spots a job pushing to a branch' \
+  'yes' \
+  "$(printf 'steps:\n  - run: |\n      git commit -m x\n      git push\n' | workflow_pushes_directly && echo yes || echo no)"
+
+check 'workflow_pushes_directly ignores a workflow that only reads' \
+  'no' \
+  "$(printf 'steps:\n  - run: git log --oneline\n  - run: pnpm test\n' | workflow_pushes_directly && echo yes || echo no)"
+
+check 'has_script_contract accepts all three scripts' \
+  'yes' \
+  "$(echo '{"scripts":{"lint":"x","typecheck":"y","test":"z"}}' | has_script_contract && echo yes || echo no)"
+
+check 'has_script_contract rejects a missing script' \
+  'no' \
+  "$(echo '{"scripts":{"lint":"x","test":"z"}}' | has_script_contract && echo yes || echo no)"
+
+# Empty targets must stay an empty array: a repo that is neither a Worker nor a VS Code
+# extension takes no target layer rather than a wrong one.
+check 'build_athena_config emits an empty targets array' \
+  'v1|ts|0|1' \
+  "$(build_athena_config ts '' claude | jq -r '"\(.athenaVersion)|\(.stack)|\(.targets|length)|\(.tools|length)"' 2>/dev/null)"
+
+check 'build_athena_config splits comma lists' \
+  'workers,vscode-ext|claude,codex' \
+  "$(build_athena_config ts workers,vscode-ext claude,codex | jq -r '"\(.targets|join(","))|\(.tools|join(","))"' 2>/dev/null)"
+
 printf '\n%d passed, %d failed\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]

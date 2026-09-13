@@ -51,7 +51,7 @@ jobs:
         with:
           args: >-
             --severity=warning scripts/new-project.sh scripts/setup-machine.sh
-            scripts/lib.sh scripts/tests.sh
+            scripts/adopt-project.sh scripts/lib.sh scripts/tests.sh
 
   # scripts/tests.sh regression-tests the pure logic extracted into scripts/lib.sh — the
   # entry scripts themselves can never run in CI (they create real GitHub repos / mutate
