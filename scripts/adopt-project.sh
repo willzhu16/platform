@@ -135,12 +135,14 @@ if [ "$blockers" -gt 0 ]; then
 fi
 
 echo "Writing into ${REPO_DIR}:"
-mkdir -p "${REPO_DIR}/.github/workflows"
 
 IFS=','
 for piece in $PIECES; do
   case "$piece" in
     security|ci|codeql)
+      # Created here rather than up front: asking only for 'instructions' should not leave
+      # an empty .github/workflows behind in a repo that has none.
+      mkdir -p "${REPO_DIR}/.github/workflows"
       render_caller_workflow "$piece" "$OWNER" > "${REPO_DIR}/.github/workflows/${piece}.yml"
       echo "  .github/workflows/${piece}.yml"
       ;;
