@@ -90,6 +90,11 @@ service to run; the deploy target is GitHub itself.
   own PR gate. Floors are measured, not guessed: re-measure by rendering and running,
   never by editing the number. `py-tool` has no mutation gate — mutmut 3.8 cannot run
   against its `--cov` addopts, so it stays on coverage until that is resolved.
+- **`cf-worker-app` also ships property tests** (`tests/properties.test.ts`, fast-check).
+  The seed is pinned on purpose: a moving score cannot sit under a ratcheted floor, and
+  an unreproducible failure is worse than no test. Two generators are bounded with the
+  reason written beside them — null-body statuses, and dates near the maximum Date — so
+  neither reads as an unexplained exception.
 - `.gitattributes` forces LF; keep it that way (athena's doctor is byte-exact downstream).
 
 ## Boundaries

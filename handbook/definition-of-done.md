@@ -11,7 +11,9 @@ bugs live. Agents receive this via athena `00-universal.md`, which links here.
       wrong. A change that adds code and leaves the score falling is untested code with a
       green tick next to it. Raise the floor when it rises; never lower it to go green.
 - [ ] **Acceptance criteria demonstrated** — each maps to a test or a documented manual
-      check. A criterion with neither is not met, it is hoped for.
+      check. A criterion with neither is not met, it is hoped for. Where the repo runs the
+      acceptance gate, this is checked rather than asserted: criteria carry ids, tests claim
+      them by name, and a criterion nothing covers fails the build.
 - [ ] **Behavior verified by running it** — the affected flow was exercised and observed,
       not inferred from a green test. "It compiles" is not verification.
 - [ ] **Docs updated in the same PR** — README, runbooks, or an ADR, as applicable. New
