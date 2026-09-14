@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.2](https://github.com/willzhu16/platform/compare/v1.8.1...v1.8.2) (2026-09-14)
+
+
+### Bug Fixes
+
+* **scripts:** prevent unsafe partial adoption writes ([#42](https://github.com/willzhu16/platform/issues/42)) ([dc70165](https://github.com/willzhu16/platform/commit/dc70165c04bb3bf950a33953fddc415e81b142dd))
+
 ## [1.8.1](https://github.com/willzhu16/platform/compare/v1.8.0...v1.8.1) (2026-09-12)
 
 
