@@ -3,9 +3,10 @@
 #
 #   bash scripts/tests.sh
 #
-# Needs bash, jq and python3 with PyYAML — nothing else. new-project.sh and
+# Needs bash, git, jq and python3 with PyYAML — nothing else. new-project.sh and
 # setup-machine.sh are never executed here (they create real GitHub repos and mutate the
-# machine), which is exactly why their pure logic lives in lib.sh. Gated by selftest.yml.
+# machine), which is exactly why their pure logic lives in lib.sh. The adoption CLI is
+# exercised only against disposable local repos. Gated by selftest.yml.
 #
 # Deliberately NOT `set -e`: a failing assertion must be reported and the run continue, so
 # one pass shows everything that is broken.
@@ -268,6 +269,55 @@ check 'build_athena_config emits an empty targets array' \
 check 'build_athena_config splits comma lists' \
   'workers,vscode-ext|claude,codex' \
   "$(build_athena_config ts workers,vscode-ext claude,codex | jq -r '"\(.targets|join(","))|\(.tools|join(","))"' 2>/dev/null)"
+
+echo '== adopt-project.sh (temporary repositories only)'
+
+# Exercise the CLI itself: helper tests cannot catch writes that happen before validation.
+git init -q "$TMP/adopt" || exit 1
+mkdir -p "$TMP/adopt/.athena"
+printf '{"athenaVersion":"v1","stack":"python","targets":[],"tools":["codex"],"tier":0}\n' \
+  > "$TMP/adopt/.athena/config.json"
+cp "$TMP/adopt/.athena/config.json" "$TMP/original-config.json"
+check 'adoption refuses to overwrite an existing instruction config' \
+  'rejected' \
+  "$(bash "$SCRIPT_DIR/adopt-project.sh" "$TMP/adopt" --with security,instructions >"$TMP/adopt.log" 2>&1 && echo accepted || echo rejected)"
+check 'refused instruction adoption preserves the config byte for byte' \
+  'preserved' \
+  "$(cmp -s "$TMP/original-config.json" "$TMP/adopt/.athena/config.json" && echo preserved || echo changed)"
+check 'an overwrite blocker prevents all requested writes' \
+  'absent' \
+  "$([ -e "$TMP/adopt/.github/workflows/security.yml" ] && echo present || echo absent)"
+check 'force permits replacing an instruction config' \
+  'accepted' \
+  "$(bash "$SCRIPT_DIR/adopt-project.sh" "$TMP/adopt" --with instructions --force >"$TMP/adopt.log" 2>&1 && echo accepted || echo rejected)"
+check 'forced instruction adoption writes the requested stack' \
+  'ts' \
+  "$(jq -r '.stack' "$TMP/adopt/.athena/config.json")"
+
+git init -q "$TMP/invalid-piece" || exit 1
+check 'report-only adoption succeeds without creating files' \
+  'accepted:absent' \
+  "$(bash "$SCRIPT_DIR/adopt-project.sh" "$TMP/invalid-piece" >"$TMP/adopt.log" 2>&1 && printf accepted || printf rejected):$([ -e "$TMP/invalid-piece/.github" ] && echo present || echo absent)"
+check 'adoption rejects an unknown piece' \
+  'rejected' \
+  "$(bash "$SCRIPT_DIR/adopt-project.sh" "$TMP/invalid-piece" --with security,typo >"$TMP/adopt.log" 2>&1 && echo accepted || echo rejected)"
+check 'an unknown piece leaves no partial workflow behind' \
+  'absent' \
+  "$([ -e "$TMP/invalid-piece/.github" ] && echo present || echo absent)"
+
+git init -q "$TMP/multiline-piece" || exit 1
+check 'adoption rejects a multiline piece list without writing' \
+  'rejected:absent' \
+  "$(bash "$SCRIPT_DIR/adopt-project.sh" "$TMP/multiline-piece" --with $'security\ntypo' >"$TMP/adopt.log" 2>&1 && printf accepted || printf rejected):$([ -e "$TMP/multiline-piece/.github" ] && echo present || echo absent)"
+
+git -C "$TMP/adopt" -c user.name=Test -c user.email=test@example.invalid -c commit.gpgsign=false commit -q --allow-empty -m 'test fixture' || exit 1
+git -C "$TMP/adopt" worktree add -q --detach "$TMP/worktree" || exit 1
+check 'adoption accepts a linked Git worktree' \
+  'accepted' \
+  "$(bash "$SCRIPT_DIR/adopt-project.sh" "$TMP/worktree" --with security >"$TMP/adopt.log" 2>&1 && echo accepted || echo rejected)"
+check 'worktree adoption installs the requested workflow' \
+  'present' \
+  "$([ -f "$TMP/worktree/.github/workflows/security.yml" ] && echo present || echo absent)"
 
 printf '\n%d passed, %d failed\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]

@@ -53,7 +53,20 @@ done
 
 [ -n "$REPO_DIR" ] || usage 1
 [ -d "$REPO_DIR" ] || { echo "not a directory: ${REPO_DIR}" >&2; exit 1; }
-[ -d "${REPO_DIR}/.git" ] || { echo "not a git repo: ${REPO_DIR}" >&2; exit 1; }
+[ -e "${REPO_DIR}/.git" ] && [ "$(git -C "$REPO_DIR" rev-parse --is-inside-work-tree 2>/dev/null)" = true ] \
+  || { echo "not a git repo: ${REPO_DIR}" >&2; exit 1; }
+
+# Validate the entire request before any writes. Arrays also prevent glob expansion of
+# user input, and keep the validation and write loops on exactly the same piece list.
+# A NUL delimiter reads the whole argument, including embedded newlines. Ordinary read
+# would silently discard everything after the first newline and validate only a prefix.
+IFS=',' read -r -d '' -a requested_pieces < <(printf '%s\0' "$PIECES")
+for piece in "${requested_pieces[@]}"; do
+  case "$piece" in
+    security|ci|codeql|instructions|'') ;;
+    *) echo "unknown piece: ${piece}" >&2; exit 1 ;;
+  esac
+done
 
 blockers=0
 
@@ -70,6 +83,10 @@ echo "Preflight: ${REPO_DIR}"
 # 1. Already adopted?
 if [ -f "${REPO_DIR}/.athena/config.json" ]; then
   note '.athena/config.json exists — this repo is already athena-managed'
+  if printf '%s' ",${PIECES}," | grep -q ',instructions,' && [ -z "$FORCE" ]; then
+    block '.athena/config.json already exists and --with instructions would overwrite it'
+    say '' 'pass --force to replace it, after checking its stack, tools and permission tier.'
+  fi
 else
   note 'no .athena/config.json — agents here get no compiled rules and no permission profile'
 fi
@@ -136,8 +153,7 @@ fi
 
 echo "Writing into ${REPO_DIR}:"
 
-IFS=','
-for piece in $PIECES; do
+for piece in "${requested_pieces[@]}"; do
   case "$piece" in
     security|ci|codeql)
       # Created here rather than up front: asking only for 'instructions' should not leave
@@ -155,7 +171,6 @@ for piece in $PIECES; do
     *) echo "unknown piece: ${piece}" >&2; exit 1 ;;
   esac
 done
-unset IFS
 
 cat <<'NEXT'
 

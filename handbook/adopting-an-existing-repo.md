@@ -26,6 +26,11 @@ It distinguishes two severities deliberately:
   never stops a write.
 - **BLOCK** is about something this script is about to break itself. It refuses to write.
 
+Existing requested workflows and `.athena/config.json` block all writes unless you pass
+`--force`. Review the current config before replacing it: replacement resets its stack,
+tools and permission tier to the requested defaults. Unknown pieces are rejected before
+any files are written. Linked Git worktrees are supported as well as ordinary checkouts.
+
 The warning that matters most: **a workflow that pushes directly to the default branch.**
 The Artemis main ruleset requires pull requests and linear history, so applying it would
 start rejecting that job. This is not hypothetical. `launch-start` refreshes a data
