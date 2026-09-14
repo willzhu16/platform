@@ -6,6 +6,10 @@ bugs live. Agents receive this via athena `00-universal.md`, which links here.
 - [ ] **All CI checks green** — `ci / lint`, `ci / typecheck`, `ci / test`, `ci / commits`,
       and the `security /` checks (+ `codeql / analyze` on public repos). Not "the ones
       near my change" — the whole matrix.
+- [ ] **The mutation gate holds** — `mutation / mutation` on repos that run it. Coverage
+      says a line ran; the mutation score says a test would have objected if the line were
+      wrong. A change that adds code and leaves the score falling is untested code with a
+      green tick next to it. Raise the floor when it rises; never lower it to go green.
 - [ ] **Acceptance criteria demonstrated** — each maps to a test or a documented manual
       check. A criterion with neither is not met, it is hoped for.
 - [ ] **Behavior verified by running it** — the affected flow was exercised and observed,

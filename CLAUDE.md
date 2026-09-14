@@ -84,6 +84,12 @@ service to run; the deploy target is GitHub itself.
   before encrypting anything. Leak response is documented in `security/README.md`.
 - Each template contains its own thin `security.yml` *caller* — don't confuse those with
   the reusable `security.yml` at this repo's root.
+- **Both templates gate on more than coverage now.** `cf-worker-app` ships
+  `stryker.config.json` and a repo-local `mutation.yml`; both selftest render jobs run
+  `pnpm run test:mutation`, so a template test that stops catching things fails platform's
+  own PR gate. Floors are measured, not guessed: re-measure by rendering and running,
+  never by editing the number. `py-tool` has no mutation gate — mutmut 3.8 cannot run
+  against its `--cov` addopts, so it stays on coverage until that is resolved.
 - `.gitattributes` forces LF; keep it that way (athena's doctor is byte-exact downstream).
 
 ## Boundaries

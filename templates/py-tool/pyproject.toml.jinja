@@ -26,8 +26,9 @@ packages = ["src/{{ project_name.replace('-', '_') }}"]
 [tool.pytest.ini_options]
 # --cov-fail-under turns coverage into a gate instead of a report nobody reads. Opening
 # floor, set below current coverage on purpose. Raise it as the suite grows; never lower
-# it to turn a red build green.
-addopts = "--cov={{ project_name.replace('-', '_') }} --cov-fail-under=60"
+# it to turn a red build green. The rendered template measures 100%, so this leaves room
+# for a first feature to land before its tests do, and no more.
+addopts = "--cov={{ project_name.replace('-', '_') }} --cov-fail-under=90"
 
 [tool.ruff]
 line-length = 100

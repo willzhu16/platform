@@ -10,10 +10,13 @@ export default defineConfig({
       include: ['src/**/*.ts'],
       // Opening floor, set below current coverage on purpose. Raise it as the suite grows.
       // Never lower it to turn a red build green — add the missing test instead.
-      // Measured on the rendered template by selftest: 76.27 lines/statements, 71.42
-      // functions, 52.63 branches. These sit a few points under that, so ordinary churn
-      // does not go red but a real regression does. Ratchet up as the suite grows.
-      thresholds: { lines: 70, functions: 65, statements: 70, branches: 45 },
+      // Measured on both selftest renders: worst case 91.48 lines, 91.66 statements,
+      // 92.85 functions, 84.21 branches. These sit a few points under that, so ordinary
+      // churn does not go red but a real regression does. Ratchet up as the suite grows.
+      //
+      // Coverage is the weaker of the two gates here: it only proves a line ran. See
+      // stryker.config.json for the mutation score, which proves a test would object.
+      thresholds: { lines: 85, functions: 85, statements: 85, branches: 78 },
     },
   },
 });

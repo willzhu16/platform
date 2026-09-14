@@ -240,6 +240,7 @@ jobs:
           pnpm install
           pnpm typecheck
           pnpm test
+          pnpm run test:mutation
           pnpm build
 
   # The all-features render never exercises the OFF paths. A conditional FILENAME like
@@ -299,6 +300,7 @@ jobs:
           pnpm install
           pnpm typecheck
           pnpm test
+          pnpm run test:mutation
           pnpm build
 
   render-py-tool:
