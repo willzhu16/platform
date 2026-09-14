@@ -1,3 +1,4 @@
+import fc from 'fast-check';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { verifyTurnstile } from '../src/lib/turnstile.js';
 
@@ -78,5 +79,34 @@ describe('verifyTurnstile request', () => {
     vi.stubGlobal('fetch', async () => Response.json({ success: 'true' }));
 
     await expect(verifyTurnstile('token', 'secret')).resolves.toBe(false);
+  });
+});
+
+describe('verifyTurnstile fails closed', () => {
+  // Bot protection is only worth having if every unclear answer counts as a rejection.
+  // These state that as a rule rather than naming the three responses someone thought of.
+  it('rejects any success value that is not the boolean true', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.jsonValue().filter((value) => value !== true),
+        async (success) => {
+          vi.stubGlobal('fetch', async () => Response.json({ success }));
+
+          await expect(verifyTurnstile('token', 'secret')).resolves.toBe(false);
+        },
+      ),
+      { numRuns: 100 },
+    );
+  });
+
+  it('rejects any non-2xx answer from siteverify', async () => {
+    await fc.assert(
+      fc.asyncProperty(fc.integer({ min: 400, max: 599 }), async (status) => {
+        vi.stubGlobal('fetch', async () => new Response('nope', { status }));
+
+        await expect(verifyTurnstile('token', 'secret')).resolves.toBe(false);
+      }),
+      { numRuns: 60 },
+    );
   });
 });
