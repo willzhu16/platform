@@ -1,0 +1,110 @@
+# The testing standard
+
+Why this exists: **the gate matrix is the reviewer** (D-04). There is one person on this
+fleet and no second human to read a diff, so "reviewed" has to mean "a machine proved it",
+not "someone looked at it and felt fine". Everything below is written to make that true, and
+to be honest about where it stops being true.
+
+Agents receive the short form of this through athena's `00-universal.md`, which links here.
+
+## The order of work
+
+1. **Write down what done means, before starting.** In the task packet, as numbered
+   criteria. See "Criteria carry ids" below.
+2. **Write the test, and watch it fail.** A test written after the code records what the
+   code does, not what it should do. For a bug it must fail for the right reason first.
+3. **Write the code until the test passes.**
+4. **Check the gates.** They are listed below and they all run on the pull request.
+
+## Criteria carry ids
+
+This is the one habit the whole thing rests on, and the only part a person has to remember.
+
+Write each acceptance criterion with a stable id:
+
+```
+- AC-1: an expired token is rejected with a 401 rather than a 500
+- AC-2: the retry stops after three attempts
+```
+
+A test claims a criterion by writing that id, followed by a colon, in its name:
+
+```ts
+it('AC-1: rejects an expired token with a 401', () => { ... });
+```
+
+The colon is what separates a claim from a mention, so a test *discussing* AC-10 is not
+counted as covering it. The id may sit on the `it` or on a `describe` wrapping several
+tests.
+
+The `acceptance` check then fails the build for any criterion with no passing test, any
+criterion whose only tests fail, any test claiming an id the packet does not list, any
+reused id, and any packet with no criteria at all.
+
+**A criterion that can only be checked by hand gets no id.** Leave it off deliberately and
+say in the pull request how you checked it. A gate that silently counts manual criteria as
+covered is worse than no gate, because it reports confidence it never earned.
+
+## The gates, and what each one is for
+
+| Gate | Answers |
+|---|---|
+| `lint` | Is it written the way this fleet writes code? |
+| `typecheck` | Do the types hold? |
+| `test` | Do the tests pass? |
+| coverage floor | Did the tests at least *run* the new code? |
+| `mutation` | Would a test have **noticed** if the code were wrong? |
+| `acceptance` | Does every criterion someone wrote down have a passing test? |
+| `security` | Secrets, known-vulnerable dependencies, dangerous patterns. |
+| smoke | Does the **deployed** thing work, not just the code? |
+
+The two that are easy to confuse:
+
+**Coverage is the weak one.** It proves a line executed. A test that runs a line and
+asserts nothing scores the same as one that checks the answer.
+
+**Mutation testing is the strong one.** It rewrites the source many ways — flips a
+comparison, empties a string, deletes a branch — and reports how many of those edits broke
+a test. It is the difference between checking a smoke alarm's light is on and holding a
+match under it. It caught `doctor.ts`, the drift checker, sitting at 48% while every test
+was green: it could have been rewritten to report a missing permission profile as a pass.
+
+**Smoke is the one that does not trust any of the others.** Everything else runs against
+source. Smoke runs against the deployed URL, because security headers arriving at a real
+client depend on the wrangler config and the routing, which no unit test sees.
+
+## Floors are measured, then ratcheted
+
+Every threshold in this fleet — coverage, mutation score — was obtained by running
+something and then set a few points under it.
+
+- **Raise a floor when the number rises.** That is the ratchet.
+- **Never lower one to turn a red build green.** Add the missing test instead.
+- Re-baselining is allowed when a repo grows real code and the scaffolding's numbers stop
+  being meaningful. Do it as a deliberate edit that shows up in a diff, with the new
+  measurement in the commit message. Never as a reflex.
+- Re-derive the number by running the tool. Never edit a stale figure to match a guess.
+
+## When a branch genuinely cannot be tested
+
+Say so at the site, in a comment, and file it. Do not leave a silent hole, and do not force
+a contrived test that passes without proving anything.
+
+The Worker template's error path was an example: covering it looked impossible, the note
+said so, and on a second look it needed one injectable parameter. Writing the limitation
+down is what made it fixable later.
+
+## What these gates do not catch
+
+Being clear about this is what keeps the rest trustworthy.
+
+- **Wrong requirements.** If the criteria describe the wrong product, every gate goes green
+  on the wrong thing. This is why the criteria are written by a person, before the work.
+- **Tests that encode the same misunderstanding as the code.** When one author writes both,
+  they can be wrong together. Mutation testing proves a test is *sensitive*; it cannot
+  prove it asserts the *right* thing. The defence is that criteria come from outside the
+  implementation.
+- **Architecture and taste.** No gate will tell you a design will be painful in six months.
+- **Whether the thing is worth building.**
+
+Everything on that list is a reason to spend review effort on the packet, not the diff.

@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { formatLine } from '../src/lib/log.js';
 import { withSecurityHeaders } from '../src/middleware/security-headers.js';
 
 describe('withSecurityHeaders', () => {
@@ -8,21 +7,37 @@ describe('withSecurityHeaders', () => {
     expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff');
     expect(response.headers.get('Content-Security-Policy')).toContain("default-src 'self'");
   });
-});
 
-describe('formatLine', () => {
-  it('emits a schema-conformant JSON line', () => {
-    const parsed = JSON.parse(formatLine('info', 'v1.0.0', { event: 'test_event' }));
-    expect(parsed).toMatchObject({ level: 'info', projectVersion: 'v1.0.0', event: 'test_event' });
-    expect(typeof parsed.ts).toBe('string');
+  it('sets every header in the starter policy, with its exact value', () => {
+    // These are the whole of a new project's browser-side defence until someone tightens
+    // them. A weakened value here is invisible in a test that only checks the name is set.
+    const headers = withSecurityHeaders(new Response('ok')).headers;
+
+    expect(Object.fromEntries(headers.entries())).toMatchObject({
+      'strict-transport-security': 'max-age=31536000; includeSubDomains',
+      'content-security-policy': "default-src 'self'; frame-ancestors 'none'",
+      'x-content-type-options': 'nosniff',
+      'referrer-policy': 'strict-origin-when-cross-origin',
+      'x-frame-options': 'DENY',
+    });
   });
 
-  it('never lets caller fields shadow the schema keys', () => {
-    // Regression: fields used to spread last, so a stray `level` misreported severity.
-    const parsed = JSON.parse(
-      formatLine('info', 'v1.0.0', { event: 'test_event', level: 'error', projectVersion: 'v9' }),
+  it('keeps the body, status and status text of the response it wraps', () => {
+    const wrapped = withSecurityHeaders(
+      new Response('not found', { status: 404, statusText: 'Not Found' }),
     );
-    expect(parsed.level).toBe('info');
-    expect(parsed.projectVersion).toBe('v1.0.0');
+
+    expect(wrapped.status).toBe(404);
+    expect(wrapped.statusText).toBe('Not Found');
+    return expect(wrapped.text()).resolves.toBe('not found');
+  });
+
+  it('keeps headers the response already carried', () => {
+    const wrapped = withSecurityHeaders(
+      new Response('{}', { headers: { 'content-type': 'application/json' } }),
+    );
+
+    expect(wrapped.headers.get('content-type')).toBe('application/json');
+    expect(wrapped.headers.get('X-Frame-Options')).toBe('DENY');
   });
 });

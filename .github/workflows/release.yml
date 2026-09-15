@@ -219,3 +219,12 @@ jobs:
           done
           echo "::error::${base%/}/healthz never reported ${TAG}. That version is live but unverified. Roll back with: gh workflow run release.yml --ref <previous tag> -f tag=<previous tag>"
           exit 1
+      - name: Smoke the deployed contract
+        # The step above proves THIS build is live. This proves the deployment works:
+        # headers actually arriving, disclosure record live and unexpired. Skipped for
+        # repos that ship no smoke script, so adopting it is opt-in per repo.
+        if: hashFiles('scripts/smoke.sh') != ''
+        env:
+          SMOKE_URL: ${{ inputs.smoke-url }}
+          DISCOVERED_URL: ${{ steps.deploy.outputs.url }}
+        run: bash scripts/smoke.sh "${SMOKE_URL:-$DISCOVERED_URL}"
