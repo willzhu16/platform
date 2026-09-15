@@ -1,0 +1,35 @@
+name: mutation
+
+# Mutation testing. The other gates answer "did the tests run and pass". This one answers
+# "would a test have noticed if the code were wrong": mutmut rewrites src/ many ways and
+# scripts/mutation.py fails the run if too few of those edits broke a test.
+#
+# Repo-local rather than part of platform's reusable ci-python.yml: it costs minutes rather
+# than seconds, so it is a separate check that can be watched without slowing the fast gates
+# down. The floor is FLOOR in scripts/mutation.py.
+#
+# Not in the Artemis main ruleset, so it reports red without blocking a merge until added.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  mutation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+      - name: Install
+        run: uv sync --frozen
+      - name: Mutation test
+        run: uv run python scripts/mutation.py

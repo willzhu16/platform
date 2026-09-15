@@ -88,8 +88,21 @@ service to run; the deploy target is GitHub itself.
   `stryker.config.json` and a repo-local `mutation.yml`; both selftest render jobs run
   `pnpm run test:mutation`, so a template test that stops catching things fails platform's
   own PR gate. Floors are measured, not guessed: re-measure by rendering and running,
-  never by editing the number. `py-tool` has no mutation gate — mutmut 3.8 cannot run
-  against its `--cov` addopts, so it stays on coverage until that is resolved.
+  never by editing the number. **`py-tool` gates on mutation too** (mutmut +
+  `scripts/mutation.py`, floor 80): its pytest `addopts` is deliberately free of `--cov`,
+  because pytest-cov's collection fights mutmut's tracer and mutation testing cannot run at
+  all with it there. Coverage still gates — `ci-python.yml` runs `pytest --cov` and the floor
+  lives in `[tool.coverage.report]`. Do not move `--cov` back into addopts.
+- **`cf-worker-app` ships a smoke script** (`scripts/smoke.sh`) that checks a *deployed*
+  Worker: /healthz, the five security headers on two paths, and a live unexpired
+  security.txt. `preview.yml` and `release.yml` run it when the repo has one
+  (`if: hashFiles(...)`), so adopting it is opt-in per repo and existing repos are
+  unaffected. It is tested in `scripts/tests.sh` against a stand-in server that can serve
+  each contract wrongly — a smoke check that only ever passes is worse than none.
+- **`acceptance.yml` (reusable) gates criteria against tests.** It resolves the packet from
+  the issue the PR closes, runs the consumer's `test` script, and hands both to athena's
+  `acceptance` CLI. Advisory when no packet is linked; `require-packet: true` makes it
+  mandatory.
 - **`cf-worker-app` also ships property tests** (`tests/properties.test.ts`, fast-check).
   The seed is pinned on purpose: a moving score cannot sit under a ratcheted floor, and
   an unreproducible failure is worse than no test. Two generators are bounded with the

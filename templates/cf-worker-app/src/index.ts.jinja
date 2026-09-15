@@ -37,23 +37,49 @@ const handle = (request: Request, env: Env): Response => {
   return new Response('Hello from {{ project_name }}');
 };
 
+/**
+ * The contract every response goes through: one log line per request, security headers on
+ * the way out, and a thrown handler turned into a 500 rather than an unhandled rejection.
+ *
+ * `route` is a parameter with a default rather than a closure so that last guarantee can be
+ * tested. A handler that throws is the one case no request can provoke from outside, and an
+ * untested catch branch means error reporting that has never been shown to work.
+ */
+export const handleRequest = (
+  request: Request,
+  env: Env,
+  route: (request: Request, env: Env) => Response = handle,
+): Response => {
+  const version = env.PROJECT_VERSION || 'dev';
+  const logger = createLogger(version);
+  const requestId = crypto.randomUUID();
+  const start = Date.now();
+  const path = new URL(request.url).pathname;
+  try {
+    const response = route(request, { ...env, PROJECT_VERSION: version });
+    logger.info({
+      event: 'request_handled',
+      requestId,
+      route: path,
+      durationMs: Date.now() - start,
+    });
+    return withSecurityHeaders(response);
+  } catch (error) {
+    const err = error as Error;
+    Sentry.captureException(err);
+    logger.error({
+      event: 'request_failed',
+      requestId,
+      route: path,
+      err: { message: err.message },
+    });
+    return withSecurityHeaders(new Response('Internal Error', { status: 500 }));
+  }
+};
+
 const handler = {
   async fetch(request: Request, env: Env): Promise<Response> {
-    const version = env.PROJECT_VERSION || 'dev';
-    const logger = createLogger(version);
-    const requestId = crypto.randomUUID();
-    const start = Date.now();
-    const route = new URL(request.url).pathname;
-    try {
-      const response = handle(request, { ...env, PROJECT_VERSION: version });
-      logger.info({ event: 'request_handled', requestId, route, durationMs: Date.now() - start });
-      return withSecurityHeaders(response);
-    } catch (error) {
-      const err = error as Error;
-      Sentry.captureException(err);
-      logger.error({ event: 'request_failed', requestId, route, err: { message: err.message } });
-      return withSecurityHeaders(new Response('Internal Error', { status: 500 }));
-    }
+    return handleRequest(request, env);
   },
 {%- if needs_scheduled_jobs %}
 

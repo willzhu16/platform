@@ -330,7 +330,11 @@ jobs:
           uv run ruff check .
           uv run ruff format --check .
           uv run pyright
-          uv run pytest -q
+          # --cov, matching ci-python.yml: the coverage floor lives in
+          # [tool.coverage.report], not in pytest addopts, so `pytest -q` alone would not
+          # enforce it here.
+          uv run pytest --cov
+          uv run python scripts/mutation.py
       # py-tool's only visibility-dependent output is which files exist, so a private
       # render needs the absence assertion but not a second full gate run.
       - name: Render privately and assert the public-only files are absent

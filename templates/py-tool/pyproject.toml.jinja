@@ -10,6 +10,7 @@ dev = [
     "pyright>=1.1.390",
     "pytest>=8.3.0",
     "pytest-cov>=6.0.0",
+    "mutmut>=3.8.0",
     "ruff>=0.9.0",
 ]
 
@@ -24,11 +25,27 @@ build-backend = "hatchling.build"
 packages = ["src/{{ project_name.replace('-', '_') }}"]
 
 [tool.pytest.ini_options]
-# --cov-fail-under turns coverage into a gate instead of a report nobody reads. Opening
-# floor, set below current coverage on purpose. Raise it as the suite grows; never lower
-# it to turn a red build green. The rendered template measures 100%, so this leaves room
-# for a first feature to land before its tests do, and no more.
-addopts = "--cov={{ project_name.replace('-', '_') }} --cov-fail-under=90"
+# Deliberately free of --cov. Coverage still gates the build: ci-python.yml runs
+# `pytest --cov`, and the floor lives in [tool.coverage.report] below. It is kept out of
+# addopts because mutmut runs the suite with its own tracer, and pytest-cov's collection
+# fights it — with --cov here, mutation testing cannot run at all.
+addopts = "-q"
+
+[tool.coverage.run]
+source = ["src/{{ project_name.replace('-', '_') }}"]
+
+[tool.coverage.report]
+# A gate, not a report nobody reads. Opening floor, set below current coverage on purpose.
+# Raise it as the suite grows; never lower it to turn a red build green. The rendered
+# template measures 100%, so this leaves room for a first feature to land before its tests
+# do, and no more.
+fail_under = 90
+show_missing = true
+
+[tool.mutmut]
+# Mutation testing: would a test have noticed if the code were wrong. `mutmut run` exits 0
+# whatever it finds, so scripts/mutation.py applies the floor.
+source_paths = ["src/{{ project_name.replace('-', '_') }}"]
 
 [tool.ruff]
 line-length = 100

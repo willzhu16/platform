@@ -78,6 +78,11 @@ jobs:
             exit 1
           fi
           echo "url=$url" >> "$GITHUB_OUTPUT"
+      - name: Smoke the preview
+        # The cheapest place to find a broken deployment is before production. Skipped for
+        # repos that ship no smoke script, so adopting it is opt-in per repo.
+        if: hashFiles('scripts/smoke.sh') != ''
+        run: bash scripts/smoke.sh '${{ steps.preview.outputs.url }}'
       - name: Update the sticky preview comment
         env:
           GH_TOKEN: ${{ github.token }}

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import worker, { sentryOptions } from '../src/index.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import worker, { handleRequest, sentryOptions } from '../src/index.js';
 
 // Two arguments, not three: the handler declares `fetch(request, env)`, so that is the
 // arity the wrapped export is typed with. The runtime still passes its own ctx.
@@ -53,11 +53,82 @@ describe('worker routes', () => {
       expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff');
     }
   });
+});
 
-  // The catch branch in src/index.ts is deliberately not covered here. Forcing `handle`
-  // to throw means poisoning PROJECT_VERSION, and the catch logs with that same value, so
-  // the failure lands in the logger rather than on the path under test. Covering it needs
-  // a seam in the worker (an injectable handler), which is a design change, not a test.
+describe('the request contract', () => {
+  const capture = () => ({
+    out: vi.spyOn(console, 'log').mockImplementation(() => undefined),
+    err: vi.spyOn(console, 'error').mockImplementation(() => undefined),
+  });
+  const env = { PROJECT_VERSION: 'v1.2.3' } as never;
+  const request = () => new Request('https://example.com/some/route');
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('turns a throwing handler into a 500 instead of an unhandled rejection', () => {
+    // The guarantee every route depends on and no request can provoke: the Worker still
+    // answers, still carries its headers, and does not leak the error to the caller.
+    const { err } = capture();
+
+    const response = handleRequest(request(), env, () => {
+      throw new Error('handler exploded');
+    });
+
+    expect(response.status).toBe(500);
+    expect(response.headers.get('x-frame-options')).toBe('DENY');
+    expect(err).toHaveBeenCalledTimes(1);
+  });
+
+  it('logs the failure as request_failed with the route and the message', () => {
+    // If this line is wrong, an outage is invisible in the logs and Sentry is the only
+    // place the error exists.
+    const { err } = capture();
+
+    handleRequest(request(), env, () => {
+      throw new Error('handler exploded');
+    });
+    const entry = JSON.parse(err.mock.calls[0]?.[0] as string);
+
+    expect(entry.event).toBe('request_failed');
+    expect(entry.route).toBe('/some/route');
+    expect(entry.level).toBe('error');
+    expect(entry.err.message).toBe('handler exploded');
+    expect(entry.requestId).toEqual(expect.any(String));
+  });
+
+  it('does not answer 500 with the thrown message, which could carry internals', () => {
+    capture();
+
+    const response = handleRequest(request(), env, () => {
+      throw new Error('connection string postgres://user:hunter2@db');
+    });
+
+    return expect(response.text()).resolves.toBe('Internal Error');
+  });
+
+  it('logs a successful request once, with its route and duration', () => {
+    const { out, err } = capture();
+
+    const response = handleRequest(request(), env, () => new Response('ok'));
+    const entry = JSON.parse(out.mock.calls[0]?.[0] as string);
+
+    expect(response.status).toBe(200);
+    expect(err).not.toHaveBeenCalled();
+    expect(out).toHaveBeenCalledTimes(1);
+    expect(entry.event).toBe('request_handled');
+    expect(entry.route).toBe('/some/route');
+    expect(typeof entry.durationMs).toBe('number');
+  });
+
+  it('defaults the release to dev so a log line is never tagged with an empty version', () => {
+    const { out } = capture();
+
+    handleRequest(request(), { PROJECT_VERSION: '' } as never, () => new Response('ok'));
+
+    expect(JSON.parse(out.mock.calls[0]?.[0] as string).projectVersion).toBe('dev');
+  });
 });
 
 describe('sentryOptions', () => {

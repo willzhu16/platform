@@ -319,5 +319,45 @@ check 'worktree adoption installs the requested workflow' \
   'present' \
   "$([ -f "$TMP/worktree/.github/workflows/security.yml" ] && echo present || echo absent)"
 
+# --- templates/cf-worker-app/scripts/smoke.sh ------------------------------------------
+# The smoke script only ever runs against a real deployment, so the failure that matters is
+# it passing while the deployment is broken. These point it at a stand-in Worker that can
+# serve each contract wrongly on request, and assert it notices.
+SMOKE="${PLATFORM_ROOT}/templates/cf-worker-app/scripts/smoke.sh"
+
+smoke_result() { # $1=mode -> "ok" | "failed" | "no-server"
+  local mode="$1" port_file="$TMP/port.$1" pid port result
+  rm -f "$port_file"
+  python3 "$SCRIPT_DIR/smoke-fixture-server.py" "$mode" "$port_file" &
+  pid=$!
+  for _ in $(seq 1 50); do
+    [ -s "$port_file" ] && break
+    sleep 0.1
+  done
+  port="$(cat "$port_file" 2>/dev/null || true)"
+  if [ -z "$port" ]; then
+    kill "$pid" 2>/dev/null
+    echo 'no-server'
+    return
+  fi
+  if bash "$SMOKE" "http://127.0.0.1:${port}" >"$TMP/smoke.$mode.log" 2>&1; then
+    result=ok
+  else
+    result=failed
+  fi
+  kill "$pid" 2>/dev/null
+  wait "$pid" 2>/dev/null
+  echo "$result"
+}
+
+check 'smoke passes against a healthy deployment' 'ok' "$(smoke_result good)"
+check 'smoke fails when a security header is missing' 'failed' "$(smoke_result missing-header)"
+check 'smoke fails on an expired security.txt' 'failed' "$(smoke_result expired-security-txt)"
+check 'smoke fails when /healthz is unhealthy' 'failed' "$(smoke_result bad-healthz)"
+check 'smoke fails when security.txt is absent' 'failed' "$(smoke_result no-security-txt)"
+check 'smoke refuses to run without a base url' \
+  'rejected' \
+  "$(bash "$SMOKE" >/dev/null 2>&1 && echo accepted || echo rejected)"
+
 printf '\n%d passed, %d failed\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]
