@@ -23,6 +23,9 @@ bugs live. Agents receive this via athena `00-universal.md`, which links here.
 - [ ] **Scope matches the task** — everything asked for is done; nothing unasked-for
       snuck in. Partial work reported as done is worse than a question asked early.
 
+See the [testing standard](testing-standard.md) for how criteria, the gates and the floors
+fit together, and for what these gates deliberately do not catch.
+
 ## Why this exists
 
 The gate matrix is the reviewer (D-04): with no second human to catch a rushed merge,
