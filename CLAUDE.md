@@ -99,6 +99,12 @@ service to run; the deploy target is GitHub itself.
   (`if: hashFiles(...)`), so adopting it is opt-in per repo and existing repos are
   unaffected. It is tested in `scripts/tests.sh` against a stand-in server that can serve
   each contract wrongly — a smoke check that only ever passes is worse than none.
+- **Diff coverage runs inside `ci / test`**, in both `ci.yml` and `ci-python.yml`. It needs
+  a cobertura report (`coverage/cobertura-coverage.xml` for vitest, `coverage.xml` for
+  pytest) and compares against the PR's base branch; a repo emitting neither skips it with a
+  notice. Deliberately not its own check name: inside `ci / test` it is already required
+  everywhere, with no ruleset edit and no way to opt out by omission. The `test` job now
+  checks out with `fetch-depth: 0` because a shallow clone has no merge base to diff from.
 - **`acceptance.yml` (reusable) gates criteria against tests.** It resolves the packet from
   the issue the PR closes, runs the consumer's `test` script, and hands both to athena's
   `acceptance` CLI. Advisory when no packet is linked; `require-packet: true` makes it

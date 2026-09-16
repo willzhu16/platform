@@ -22,6 +22,13 @@ on:
       enforce-conventional-commits:
         type: boolean
         default: true
+      diff-coverage-min:
+        description: >-
+          Minimum coverage of the lines this pull request changed, as a percentage. Whole-repo
+          coverage hides new untested code — add 300 untested lines to a large repo and the
+          total barely moves. Set '0' to disable. Skipped when no coverage.xml is produced.
+        type: string
+        default: '90'
 
 permissions:
   contents: read
@@ -68,6 +75,10 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # Diff coverage needs the base branch to compare against; the default shallow
+          # clone has no merge base to diff from.
+          fetch-depth: 0
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
         with:
           python-version: ${{ inputs.python-version }}
@@ -75,8 +86,26 @@ jobs:
         working-directory: ${{ inputs.working-directory }}
         run: uv sync --frozen
       - name: Test
+        # --cov-report=xml alongside the default terminal report: the XML is cobertura, which
+        # is what the diff-coverage step below reads. The floor itself lives in the project's
+        # [tool.coverage.report].
         working-directory: ${{ inputs.working-directory }}
-        run: uv run pytest --cov
+        run: uv run pytest --cov --cov-report=term --cov-report=xml
+      - name: Diff coverage
+        # Runs inside `ci / test` rather than as its own check, so it needs no new required
+        # status name and cannot be skipped by a repo that never adds it to a ruleset.
+        if: github.event_name == 'pull_request' && inputs.diff-coverage-min != '0'
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          MIN: ${{ inputs.diff-coverage-min }}
+        run: |
+          if [ ! -f coverage.xml ]; then
+            echo "::notice::coverage.xml not found; skipping diff coverage."
+            exit 0
+          fi
+          git fetch --no-tags origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+          uvx diff-cover coverage.xml             --compare-branch "origin/${BASE_REF}"             --fail-under "$MIN"
 
   commits:
     if: inputs.enforce-conventional-commits && github.event_name == 'pull_request'

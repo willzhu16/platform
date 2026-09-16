@@ -24,6 +24,14 @@ on:
       enforce-conventional-commits:
         type: boolean
         default: true
+      diff-coverage-min:
+        description: >-
+          Minimum coverage of the lines this pull request changed, as a percentage. Whole-repo
+          coverage hides new untested code — add 300 untested lines to a large repo and the
+          total barely moves. Set '0' to disable. Skipped entirely when the project emits no
+          cobertura report, so adopting it is opt-in per repo.
+        type: string
+        default: '90'
 
 permissions:
   contents: read
@@ -111,6 +119,10 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # Diff coverage needs the base branch to compare against; the default shallow
+          # clone has no merge base to diff from.
+          fetch-depth: 0
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
         if: inputs.package-manager == 'pnpm'
         with:
@@ -140,6 +152,24 @@ jobs:
         run: |
           case "$PACKAGE_MANAGER" in pnpm|npm) ;; *) exit 1 ;; esac
           "$PACKAGE_MANAGER" run test
+      - name: Diff coverage
+        # Runs inside `ci / test` rather than as its own check, so it needs no new required
+        # status name and cannot be skipped by a repo that simply never adds it to a ruleset.
+        # A repo that emits no cobertura report skips this with a notice.
+        if: github.event_name == 'pull_request' && inputs.diff-coverage-min != '0'
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          MIN: ${{ inputs.diff-coverage-min }}
+        run: |
+          report=coverage/cobertura-coverage.xml
+          if [ ! -f "$report" ]; then
+            echo "::notice::${report} not found; skipping diff coverage."
+            echo "::notice::Add 'cobertura' to the coverage reporters in vitest.config.ts to enable it."
+            exit 0
+          fi
+          git fetch --no-tags origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+          pipx run diff-cover "$report"             --compare-branch "origin/${BASE_REF}"             --fail-under "$MIN"
 
   commits:
     if: inputs.enforce-conventional-commits && github.event_name == 'pull_request'

@@ -1,11 +1,11 @@
 {
   "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
-  "_comment": "Coverage says a line ran. Mutation testing says a test would have noticed if it were wrong: Stryker rewrites src/ a hundred ways and reports how many of those edits broke a test. `break` is a floor set under the measured score, like the coverage thresholds in vitest.config.ts. Measured on both selftest renders: 92.31 with every feature on, 97.80 with them off. Raise the floor as the suite grows; never lower it to turn a red build green.",
+  "_comment": "Coverage says a line ran. Mutation testing says a test would have noticed if it were wrong: Stryker rewrites src/ a hundred ways and reports how many of those edits broke a test. `break` is a floor set under the measured score, like the coverage thresholds in vitest.config.ts. Measured on both selftest renders: 92.31 with every feature on, 97.80 with them off. Ratcheted to 88 on 2026-09-16. Raise the floor as the suite grows; never lower it to turn a red build green.",
   "packageManager": "pnpm",
   "testRunner": "vitest",
   "plugins": ["@stryker-mutator/vitest-runner"],
   "mutate": ["src/**/*.ts"],
   "reporters": ["clear-text", "progress"],
   "coverageAnalysis": "perTest",
-  "thresholds": { "high": 95, "low": 85, "break": 85 }
+  "thresholds": { "high": 95, "low": 88, "break": 88 }
 }

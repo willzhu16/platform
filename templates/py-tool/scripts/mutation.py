@@ -22,11 +22,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-# Floor, not a target. Measured on the rendered template: 100% with 4 mutants. Set under
-# that with room for one gap, because at this size a single uncaught mutant is a large
-# percentage. Raise it as the suite grows; never lower it to turn a red build green, and
-# re-baseline deliberately once this repo has real code rather than scaffolding.
-FLOOR = 80.0
+# Floor, not a target. Measured on the rendered template: 100% with 4 mutants. Ratcheted to
+# 90 on 2026-09-16; at this size a single uncaught mutant is 25%, so one gap still fails and
+# that is intended while the source is this small. Raise it as the suite grows, never lower
+# it to turn a red build green, and re-baseline deliberately once this repo has real code.
+FLOOR = 90.0
 
 STATS = Path("mutants") / "mutmut-cicd-stats.json"
 

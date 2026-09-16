@@ -37,9 +37,9 @@ source = ["src/{{ project_name.replace('-', '_') }}"]
 [tool.coverage.report]
 # A gate, not a report nobody reads. Opening floor, set below current coverage on purpose.
 # Raise it as the suite grows; never lower it to turn a red build green. The rendered
-# template measures 100%, so this leaves room for a first feature to land before its tests
-# do, and no more.
-fail_under = 90
+# template measures 100%; ratcheted to 95 on 2026-09-16, which still leaves room for a
+# first feature to land before its tests do, and no more.
+fail_under = 95
 show_missing = true
 
 [tool.mutmut]

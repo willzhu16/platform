@@ -52,7 +52,8 @@ covered is worse than no gate, because it reports confidence it never earned.
 | `lint` | Is it written the way this fleet writes code? |
 | `typecheck` | Do the types hold? |
 | `test` | Do the tests pass? |
-| coverage floor | Did the tests at least *run* the new code? |
+| coverage floor | Did the tests at least *run* the code? |
+| diff coverage | Are the lines **this pull request changed** covered? |
 | `mutation` | Would a test have **noticed** if the code were wrong? |
 | `acceptance` | Does every criterion someone wrote down have a passing test? |
 | `security` | Secrets, known-vulnerable dependencies, dangerous patterns. |
@@ -62,6 +63,13 @@ The two that are easy to confuse:
 
 **Coverage is the weak one.** It proves a line executed. A test that runs a line and
 asserts nothing scores the same as one that checks the answer.
+
+**Whole-repo coverage hides new code.** Add three hundred untested lines to a large repo
+and the total barely moves — the number stays green while the thing you just wrote is
+untested. Diff coverage asks the sharper question: of the lines this pull request touched,
+how many are covered. It runs inside `ci / test`, so it needs no separate required check
+and cannot be skipped by a repo that never adds one to its ruleset. A project that emits no
+cobertura report skips it with a notice rather than failing.
 
 **Mutation testing is the strong one.** It rewrites the source many ways — flips a
 comparison, empties a string, deletes a branch — and reports how many of those edits broke
