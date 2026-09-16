@@ -20,19 +20,20 @@ caller workflows are a frozen contract (D-18): renaming one silently strands eve
 | `security / gitleaks`, `security / semgrep`, `security / osv` | the `security` caller job |
 | `codeql / analyze` | the `codeql` caller job (public repos) |
 | `mutation` | the repo-local `mutation.yml` |
+| `acceptance / acceptance` | the `acceptance` caller job (both templates) |
 
-## Two checks deliberately left out
-
-**`acceptance / acceptance`** works only for TypeScript repos today. The reusable workflow
-runs the consumer's `test` script and reads a vitest JSON report; `py-tool` produces neither.
-Add it per-repo for a TS project once that repo is writing packets with criterion ids:
-
-```bash
-gh api -X PUT "repos/<owner>/<repo>/rulesets/<id>" --input <(...)   # add {"context": "acceptance / acceptance"}
-```
+## One check deliberately left out
 
 **`preview / deploy`** is a Cloudflare and network dependency, so it fails for reasons that
 have nothing to do with the change under review.
+
+## This file is for repos generated AFTER the checks existed
+
+Every context here must already be reported by a workflow in the repo's default branch.
+Applying this to an older repo generated before `mutation.yml` and `acceptance.yml` existed
+locks it: the checks never report, so they never pass, and nothing can merge. Bring such a
+repo up to date with a copier sweep first, confirm both workflows run on a pull request,
+then apply the ruleset.
 
 ## Before adding a check here
 
