@@ -21,10 +21,10 @@ body:
     attributes:
       label: Acceptance criteria
       description: >-
-        Observable checks, one per line, each with a stable id. A test claims one by writing
-        that id and a colon in its name, so the build can fail for any criterion nothing
-        covers. Leave the id off a criterion that can only be checked by hand, and say in the
-        PR how you checked it.
+        Observable checks, one per line, each with a stable id. A test claims one by naming
+        it — `AC-1:` in a TypeScript test name, `test_ac_1_...` in Python — so the build can
+        fail for any criterion nothing covers. Leave the id off a criterion that can only be
+        checked by hand, and say in the PR how you checked it.
       placeholder: |
         - AC-1: an expired token is rejected with a 401 rather than a 500
         - AC-2: the retry stops after three attempts
