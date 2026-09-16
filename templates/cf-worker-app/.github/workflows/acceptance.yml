@@ -1,0 +1,19 @@
+name: acceptance
+
+# Every acceptance criterion in this PR's task packet must have a passing test that claims
+# it. The packet is the issue the PR closes; criteria carry ids (`- AC-1: ...`) and a test
+# claims one by writing `AC-1:` in its name.
+#
+# Advisory by default: a PR that links no packet issue skips this, matching task-packet.md
+# ("small fixes may skip the packet — they never skip the gates"). Set require-packet: true
+# once every change here is expected to carry one.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  acceptance: # job id MUST be `acceptance` — check-name contract
+    uses: willzhu16/platform/.github/workflows/acceptance.yml@v1

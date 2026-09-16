@@ -4,14 +4,22 @@
   "enforcement": "active",
   "conditions": {
     "ref_name": {
-      "include": ["~DEFAULT_BRANCH"],
+      "include": [
+        "~DEFAULT_BRANCH"
+      ],
       "exclude": []
     }
   },
   "rules": [
-    { "type": "deletion" },
-    { "type": "non_fast_forward" },
-    { "type": "required_linear_history" },
+    {
+      "type": "deletion"
+    },
+    {
+      "type": "non_fast_forward"
+    },
+    {
+      "type": "required_linear_history"
+    },
     {
       "type": "pull_request",
       "parameters": {
@@ -20,7 +28,10 @@
         "require_code_owner_review": false,
         "require_last_push_approval": false,
         "required_review_thread_resolution": false,
-        "allowed_merge_methods": ["squash", "merge"]
+        "allowed_merge_methods": [
+          "squash",
+          "merge"
+        ]
       }
     },
     {
@@ -29,13 +40,30 @@
         "strict_required_status_checks_policy": true,
         "do_not_enforce_on_create": false,
         "required_status_checks": [
-          { "context": "ci / lint" },
-          { "context": "ci / typecheck" },
-          { "context": "ci / test" },
-          { "context": "ci / commits" },
-          { "context": "security / gitleaks" },
-          { "context": "security / semgrep" },
-          { "context": "security / osv" }
+          {
+            "context": "ci / lint"
+          },
+          {
+            "context": "ci / typecheck"
+          },
+          {
+            "context": "ci / test"
+          },
+          {
+            "context": "ci / commits"
+          },
+          {
+            "context": "security / gitleaks"
+          },
+          {
+            "context": "security / semgrep"
+          },
+          {
+            "context": "security / osv"
+          },
+          {
+            "context": "mutation"
+          }
         ]
       }
     }

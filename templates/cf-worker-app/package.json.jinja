@@ -8,7 +8,8 @@
     "dev": "wrangler dev",
     "lint": "biome ci .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --coverage",
+    "test": "vitest run --coverage --reporter=default --reporter=json --outputFile=reports/tests.json",
+    "test:mutation": "stryker run",
     "build": "wrangler deploy --dry-run --outdir dist",
     "cf-typegen": "wrangler types"
   },
@@ -18,7 +19,10 @@
   "devDependencies": {
     "@biomejs/biome": "^2.5.2",
     "@cloudflare/workers-types": "^4.20250101.0",
+    "@stryker-mutator/core": "10.0.0",
+    "@stryker-mutator/vitest-runner": "10.0.0",
     "@vitest/coverage-v8": "^4.1.11",
+    "fast-check": "^4.10.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.11",
     "wrangler": "^4.0.0"

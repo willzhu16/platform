@@ -18,9 +18,23 @@ uv run {{ project_name }}   # run the console script
 uv run ruff check .        # lint
 uv run ruff format --check .  # format
 uv run pyright             # typecheck (strict)
-uv run pytest --cov        # test with coverage
+uv run pytest --cov        # test with coverage (floor in [tool.coverage.report])
+uv run python scripts/mutation.py  # would a test notice if the code were wrong?
 ```
 
 CI runs the shared Artemis pipelines (`ci`, `security`{% if visibility == 'public' %}, `codeql`{% endif %}) on every PR via
 [ci-python.yml](https://github.com/willzhu16/platform). Behaviour is customised through
 tool config in `pyproject.toml` (ruff, pyright, pytest), never by renaming commands.
+
+`scripts/mutation.py` is the one worth understanding. Coverage proves a line ran; the
+mutation score proves a test would have objected. It rewrites `src/` many ways and fails if
+too few of those edits break a test. Note that pytest `addopts` is deliberately free of
+`--cov`: coverage collection fights mutmut's tracer, so the coverage floor lives in
+`[tool.coverage.report]` and CI passes `--cov` on the command line. Do not move it back.
+
+**Write acceptance criteria with ids.** In the task packet, number each one
+(`- AC-1: an expired token is rejected`), and claim it from a test by putting `AC-1:` in the
+test name. A criterion you can only check by hand gets no id — say in the PR how you
+checked it. Never lower a floor to turn a red build green; add the missing test. The full
+standard is the
+[testing standard](https://github.com/willzhu16/platform/blob/v1/handbook/testing-standard.md).

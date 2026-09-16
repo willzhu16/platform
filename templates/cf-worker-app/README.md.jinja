@@ -17,14 +17,29 @@ pnpm dev          # wrangler dev — serves http://localhost:8787
 ## Gates (run before pushing; CI runs them too)
 
 ```bash
-pnpm lint         # biome ci .
-pnpm typecheck    # tsc --noEmit
-pnpm test         # vitest run --coverage
-pnpm build        # wrangler dry-run build
+pnpm lint            # biome ci .
+pnpm typecheck       # tsc --noEmit
+pnpm test            # vitest run --coverage (coverage floor in vitest.config.ts)
+pnpm run test:mutation  # would a test notice if the code were wrong? floor in stryker.config.json
+pnpm build           # wrangler dry-run build
 ```
 
-CI runs the shared Artemis pipelines (`ci`, `security`{% if visibility == 'public' %}, `codeql`{% endif %}) on every PR. See
-[docs/runbooks/deploy.md](docs/runbooks/deploy.md) and
+`test:mutation` is the one worth understanding. Coverage proves a line ran; the mutation
+score proves a test would have objected. It rewrites `src/` many ways and fails if too few
+of those edits break a test.
+
+**Write acceptance criteria with ids.** In the task packet, number each one
+(`- AC-1: an expired token is rejected with a 401`), and claim it from a test by putting
+`AC-1:` in the test name. CI then fails for any criterion with no passing test. A criterion
+you can only check by hand gets no id — say in the PR how you checked it.
+
+Never lower a coverage or mutation floor to turn a red build green; add the missing test.
+
+CI runs the shared Artemis pipelines (`ci`, `security`, `acceptance`{% if visibility == 'public' %}, `codeql`{% endif %}) on every PR, plus
+`mutation`. `scripts/smoke.sh` checks the deployed Worker on every preview and release. The
+full standard is the
+[testing standard](https://github.com/willzhu16/platform/blob/v1/handbook/testing-standard.md).
+See [docs/runbooks/deploy.md](docs/runbooks/deploy.md) and
 [docs/runbooks/rollback.md](docs/runbooks/rollback.md) for operations.
 
 ## Deploy
