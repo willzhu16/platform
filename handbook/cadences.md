@@ -18,6 +18,9 @@ The workflow embeds a copy of these checklists (`CHECKLISTS`); edit both togethe
 - [ ] **Session-log harvest** — read the month's agent session logs; convert recurring
       mistakes into a lint/CI rule (preferred, deterministic) or an instruction line
       (fallback). This is the athena flywheel (ARCHITECTURE §6.0 rule 5) made a ritual.
+      Start by tallying the enumerated fields (Plan / Gates / Retries / Abstained — see
+      [the template](templates/session-log.md)) across the month's PRs; they are the part
+      a program can count, so they say where to read closely before you read anything.
 
 ## Quarterly (Jan / Apr / Jul / Oct)
 
