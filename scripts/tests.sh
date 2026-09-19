@@ -359,5 +359,72 @@ check 'smoke refuses to run without a base url' \
   'rejected' \
   "$(bash "$SMOKE" >/dev/null 2>&1 && echo accepted || echo rejected)"
 
+# --- session-log validator -------------------------------------------------------------
+# The block is the only record of HOW a change was made, and the monthly harvest is meant to
+# count it. These assert the enumerated half actually gates: a log that reads complete but
+# carries an unfilled placeholder, or an unenumerated Plan value, is exactly what would
+# otherwise reach the harvest as data.
+# shellcheck source=scripts/session-log.sh
+. "$SCRIPT_DIR/session-log.sh"
+
+WELL_FORMED='## Session log
+Tool/model: claude/opus-5
+Packet: #42
+Plan: before-first-edit
+Gates: lint typecheck test
+Retries: 0 gate failures before green
+Abstained: no
+Tried: scoped the ban to src/ and proved it by rule name
+Dead ends: asserted on the exit code, which a formatting error also satisfies
+Decisions and why: listed bare specifiers so the rule stands on its own'
+
+log_verdict() { # $1=block -> ok, or the first problem reported
+  local out
+  if out="$(validate_session_log "$1" 2>&1)"; then echo ok; else echo "$out" | head -1; fi
+}
+
+mutate_log() { # $1=sed script -> WELL_FORMED with one field changed
+  printf '%s\n' "$WELL_FORMED" | sed "$1"
+}
+
+check 'a filled session log passes' 'ok' "$(log_verdict "$WELL_FORMED")"
+
+check 'a body with no session log is rejected' \
+  'no "## Session log" heading — every agent PR body ends with one' \
+  "$(log_verdict 'Some PR prose and nothing else.')"
+
+check 'a missing enumerated field is named' \
+  'missing field: Plan' \
+  "$(log_verdict "$(printf '%s\n' "$WELL_FORMED" | grep -v '^Plan:')")"
+
+check 'an unenumerated Plan value is rejected' \
+  'field Plan does not match ^(before-first-edit|mid-task|none)$: sort of' \
+  "$(log_verdict "$(mutate_log 's/^Plan: .*/Plan: sort of/')")"
+
+check 'a non-numeric retry count is rejected' \
+  'field Retries does not match ^[0-9]+: several' \
+  "$(log_verdict "$(mutate_log 's/^Retries: .*/Retries: several/')")"
+
+check 'an unfilled placeholder is rejected, not read as an answer' \
+  'placeholder left unfilled: Tried' \
+  "$(log_verdict "$(mutate_log 's|^Tried: .*|Tried: <the approach that worked>|')")"
+
+check 'abstaining yes without a reason is rejected' \
+  'field Abstained does not match ^(no|yes[[:space:]]*[—-].+)$: yes' \
+  "$(log_verdict "$(mutate_log 's/^Abstained: .*/Abstained: yes/')")"
+
+check 'abstaining yes with a reason passes' 'ok' \
+  "$(log_verdict "$(mutate_log 's/^Abstained: .*/Abstained: yes — the packet named two outcomes/')")"
+
+check 'a field stated twice is reported rather than silently resolved' \
+  'field stated 2 times: Plan' \
+  "$(log_verdict "$(printf '%s\n%s\n' "$WELL_FORMED" 'Plan: mid-task')")"
+
+# Closes the loop the semgrep and gitleaks fixtures close: the shipped template and the
+# validator that judges it cannot drift apart without this going red.
+check "the handbook template's worked example satisfies the validator" 'ok' \
+  "$(log_verdict "$(awk '/^## Example/{flag=1} flag' "$PLATFORM_ROOT/handbook/templates/session-log.md" \
+      | sed -n '/^```/,/^```$/p' | sed '1d;$d')")"
+
 printf '\n%d passed, %d failed\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]
