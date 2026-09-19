@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.10.0](https://github.com/willzhu16/platform/compare/v1.9.0...v1.10.0) (2026-09-19)
+
+
+### Features
+
+* **handbook:** make the session log countable, and check it ([#49](https://github.com/willzhu16/platform/issues/49)) ([d8dac28](https://github.com/willzhu16/platform/commit/d8dac28e262803ed429776ec05034e1b4b13b100))
+* **templates:** enforce the Python conventions ruff can check ([#48](https://github.com/willzhu16/platform/issues/48)) ([c394ddf](https://github.com/willzhu16/platform/commit/c394ddfd725324e9d4eb39d638993d32d5a0673a))
+* **templates:** make Workers runtime rules a lint error ([#47](https://github.com/willzhu16/platform/issues/47)) ([e3e87a6](https://github.com/willzhu16/platform/commit/e3e87a64517e563285f5381c2bc16958844d7e3e))
+
 ## [1.9.0](https://github.com/willzhu16/platform/compare/v1.8.2...v1.9.0) (2026-09-16)
 
 
