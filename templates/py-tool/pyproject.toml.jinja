@@ -52,7 +52,24 @@ line-length = 100
 
 [tool.ruff.lint]
 # One fast tool per job (D-21): ruff owns lint + import-sort + format.
-select = ["E", "F", "I", "UP", "B"]
+#
+# N, ANN and PLR0915 are the mechanical half of athena's 20-stack-python layer. That layer
+# asks for snake_case names, annotated public signatures, precise types over Any, and
+# functions under roughly 40 lines — all of which were prose an agent could simply not
+# follow, with nothing checking. A rule the linter owns is a rule that holds.
+select = ["E", "F", "I", "UP", "B", "N", "ANN", "PLR0915"]
+
+[tool.ruff.lint.pylint]
+# The layer says "keep functions under ~40 lines"; ruff counts statements, which is the
+# closest thing it measures. Set to the number the layer states rather than ruff's default
+# of 50, so the gate and the written rule say the same thing.
+max-statements = 40
+
+[tool.ruff.lint.per-file-ignores]
+# Annotations are required at boundaries, and a test function is not one. Naming and the
+# statement cap still apply here: a CamelCase test is still wrong and a sixty-statement test
+# is still worth splitting.
+"tests/**" = ["ANN"]
 
 [tool.pyright]
 # Strict by default (D-21); pyright over mypy for speed and inference.
