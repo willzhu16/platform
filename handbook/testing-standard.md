@@ -27,15 +27,24 @@ Write each acceptance criterion with a stable id:
 - AC-2: the retry stops after three attempts
 ```
 
-A test claims a criterion by writing that id, followed by a colon, in its name:
+A test claims a criterion by naming it, in whatever spelling the language allows:
 
 ```ts
 it('AC-1: rejects an expired token with a 401', () => { ... });
 ```
 
-The colon is what separates a claim from a mention, so a test *discussing* AC-10 is not
-counted as covering it. The id may sit on the `it` or on a `describe` wrapping several
-tests.
+```python
+def test_ac_1_rejects_an_expired_token(): ...
+```
+
+Python function names cannot contain `-` or `:`, so the claim is spelled as an identifier.
+One concept, two spellings, each idiomatic where it is used.
+
+The separator after the number is what distinguishes a claim from a mention, so a test
+*discussing* AC-10 is not counted as covering it. An id inside a longer word claims nothing
+either — `test_mac_10_address` is not evidence for AC-10. In TypeScript the id may sit on the
+`it` or on a `describe` wrapping several tests; in Python it can be on the test function or
+its module.
 
 The `acceptance` check then fails the build for any criterion with no passing test, any
 criterion whose only tests fail, any test claiming an id the packet does not list, any
