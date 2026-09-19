@@ -63,6 +63,9 @@
           },
           {
             "context": "mutation"
+          },
+          {
+            "context": "acceptance / acceptance"
           }
         ]
       }

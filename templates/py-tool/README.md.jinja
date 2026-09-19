@@ -33,8 +33,10 @@ too few of those edits break a test. Note that pytest `addopts` is deliberately 
 `[tool.coverage.report]` and CI passes `--cov` on the command line. Do not move it back.
 
 **Write acceptance criteria with ids.** In the task packet, number each one
-(`- AC-1: an expired token is rejected`), and claim it from a test by putting `AC-1:` in the
-test name. A criterion you can only check by hand gets no id — say in the PR how you
+(`- AC-1: an expired token is rejected`), and claim it from a test by naming it. Python
+function names cannot contain `-` or `:`, so the claim is spelled as an identifier:
+`def test_ac_1_rejects_an_expired_token`. CI then fails for any criterion with no passing
+test. A criterion you can only check by hand gets no id — say in the PR how you
 checked it. Never lower a floor to turn a red build green; add the missing test. The full
 standard is the
 [testing standard](https://github.com/willzhu16/platform/blob/v1/handbook/testing-standard.md).
