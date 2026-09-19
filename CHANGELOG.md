@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.0](https://github.com/willzhu16/platform/compare/v1.8.2...v1.9.0) (2026-09-16)
+
+
+### Features
+
+* **acceptance:** run the criteria gate on Python repos too ([#45](https://github.com/willzhu16/platform/issues/45)) ([436c528](https://github.com/willzhu16/platform/commit/436c5286dcfc8b8d85665fc9259de471f333dffa))
+
 ## [1.8.2](https://github.com/willzhu16/platform/compare/v1.8.1...v1.8.2) (2026-09-14)
 
 
