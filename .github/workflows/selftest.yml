@@ -366,6 +366,47 @@ jobs:
           # enforce it here.
           uv run pytest --cov
           uv run python scripts/mutation.py
+      - name: Assert the Python fitness rules reject a violation
+        working-directory: render-out
+        # `ruff check` passing above only proves the config parses, because the template's own
+        # sources are clean. This is the negative half, matching the cf-worker-app render and
+        # test-gitleaks-rules: each probe must be rejected BY CODE. Asserting on the exit code
+        # alone would let an unrelated finding stand in for the rule actually firing.
+        run: |
+          set -u
+          status=0
+          pkg="src/$(echo 'render-check-py' | tr '-' '_')"
+          probe() {
+            printf '%s\n' "$2" > "$3/fitness_probe.py"
+            if uv run ruff check "$3/fitness_probe.py" 2>&1 | grep -q "$4"; then
+              echo "ok:   $1 rejected by $4"
+            else
+              echo "::error::$1 was not rejected by $4"
+              status=1
+            fi
+            rm -f "$3/fitness_probe.py"
+          }
+          probe 'unannotated signature' 'def compute(value):
+              return value' "$pkg" ANN001
+          probe 'Any where a type belongs' 'from typing import Any
+
+
+          def compute(value: Any) -> Any:
+              return value' "$pkg" ANN401
+          probe 'CamelCase function' 'def ComputeThing() -> None:
+              return None' "$pkg" N802
+          # Annotations are deliberately not required in tests, so a test that would trip
+          # ANN must pass. A per-file-ignore that silently stopped applying would otherwise
+          # look identical to one that works.
+          printf 'def unannotated_helper(value):\n    return value\n' > tests/fitness_probe.py
+          if uv run ruff check tests/fitness_probe.py 2>&1 | grep -q ANN; then
+            echo '::error::tests/ is still subject to ANN, so the per-file-ignore is not applying'
+            status=1
+          else
+            echo 'ok:   tests/ exempt from ANN, as configured'
+          fi
+          rm -f tests/fitness_probe.py
+          exit "$status"
       # py-tool's only visibility-dependent output is which files exist, so a private
       # render needs the absence assertion but not a second full gate run.
       - name: Render privately and assert the public-only files are absent
