@@ -25,5 +25,42 @@
     "rules": {
       "recommended": true
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["src/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["node:*"]
+                  },
+                  {
+                    "group": [
+                      "fs",
+                      "fs/promises",
+                      "path",
+                      "net",
+                      "child_process",
+                      "os",
+                      "stream",
+                      "crypto",
+                      "http",
+                      "https",
+                      "worker_threads"
+                    ]
+                  }
+                ]
+              }
+            },
+            "noProcessEnv": "error"
+          }
+        }
+      }
+    }
+  ]
 }

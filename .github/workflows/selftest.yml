@@ -238,10 +238,40 @@ jobs:
         # deploy — it validates the rendered wrangler.jsonc and bundles the Worker.
         run: |
           pnpm install
+          pnpm lint
           pnpm typecheck
           pnpm test
           pnpm run test:mutation
           pnpm build
+      - name: Assert the Workers fitness rules reject a violation
+        working-directory: render-out
+        # `pnpm lint` passing above only proves the config parses, because the template's
+        # own sources are clean. This is the negative half, modelled on test-gitleaks-rules:
+        # each probe must be rejected BY NAME. Asserting on the exit code alone would let a
+        # stray formatting error stand in for the import rule actually firing.
+        run: |
+          set -u
+          status=0
+          probe() {
+            printf '%s\n' "$2" > src/fitness-probe.ts
+            if pnpm lint 2>&1 | grep -q "$3"; then
+              echo "ok:   $1 rejected by $3"
+            else
+              echo "::error::$1 was not rejected by $3"
+              status=1
+            fi
+            rm -f src/fitness-probe.ts
+          }
+          probe 'node: built-in import' \
+            "import { readFileSync } from 'node:fs'; export const p = (f: string): string => readFileSync(f, 'utf8');" \
+            noRestrictedImports
+          probe 'bare built-in import' \
+            "import { join } from 'path'; export const p = (f: string): string => join(f, 'x');" \
+            noRestrictedImports
+          probe 'process.env access' \
+            "export const s = (): string | undefined => process.env.SECRET;" \
+            noProcessEnv
+          exit "$status"
 
   # The all-features render never exercises the OFF paths. A conditional FILENAME like
   # `{% if visibility == 'public' %}codeql.yml{% endif %}` renders to an empty name and is
@@ -298,6 +328,7 @@ jobs:
         # ship no lockfile.
         run: |
           pnpm install
+          pnpm lint
           pnpm typecheck
           pnpm test
           pnpm run test:mutation
@@ -335,6 +366,47 @@ jobs:
           # enforce it here.
           uv run pytest --cov
           uv run python scripts/mutation.py
+      - name: Assert the Python fitness rules reject a violation
+        working-directory: render-out
+        # `ruff check` passing above only proves the config parses, because the template's own
+        # sources are clean. This is the negative half, matching the cf-worker-app render and
+        # test-gitleaks-rules: each probe must be rejected BY CODE. Asserting on the exit code
+        # alone would let an unrelated finding stand in for the rule actually firing.
+        run: |
+          set -u
+          status=0
+          pkg="src/$(echo 'render-check-py' | tr '-' '_')"
+          probe() {
+            printf '%s\n' "$2" > "$3/fitness_probe.py"
+            if uv run ruff check "$3/fitness_probe.py" 2>&1 | grep -q "$4"; then
+              echo "ok:   $1 rejected by $4"
+            else
+              echo "::error::$1 was not rejected by $4"
+              status=1
+            fi
+            rm -f "$3/fitness_probe.py"
+          }
+          probe 'unannotated signature' 'def compute(value):
+              return value' "$pkg" ANN001
+          probe 'Any where a type belongs' 'from typing import Any
+
+
+          def compute(value: Any) -> Any:
+              return value' "$pkg" ANN401
+          probe 'CamelCase function' 'def ComputeThing() -> None:
+              return None' "$pkg" N802
+          # Annotations are deliberately not required in tests, so a test that would trip
+          # ANN must pass. A per-file-ignore that silently stopped applying would otherwise
+          # look identical to one that works.
+          printf 'def unannotated_helper(value):\n    return value\n' > tests/fitness_probe.py
+          if uv run ruff check tests/fitness_probe.py 2>&1 | grep -q ANN; then
+            echo '::error::tests/ is still subject to ANN, so the per-file-ignore is not applying'
+            status=1
+          else
+            echo 'ok:   tests/ exempt from ANN, as configured'
+          fi
+          rm -f tests/fitness_probe.py
+          exit "$status"
       # py-tool's only visibility-dependent output is which files exist, so a private
       # render needs the absence assertion but not a second full gate run.
       - name: Render privately and assert the public-only files are absent
