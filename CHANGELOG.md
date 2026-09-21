@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.0](https://github.com/willzhu16/platform/compare/v1.10.0...v1.11.0) (2026-09-21)
+
+
+### Features
+
+* **templates:** filter debug logs at runtime instead of promising it ([#51](https://github.com/willzhu16/platform/issues/51)) ([9bd6bab](https://github.com/willzhu16/platform/commit/9bd6babedaff1aad6183be8ffb6c5775677e93f3))
+
 ## [1.10.0](https://github.com/willzhu16/platform/compare/v1.9.0...v1.10.0) (2026-09-19)
 
 
