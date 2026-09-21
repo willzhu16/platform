@@ -1,10 +1,13 @@
 import * as Sentry from '@sentry/cloudflare';
-import { createLogger } from './lib/log.js';
+import { createLogger, toLogLevel } from './lib/log.js';
 import { buildSecurityTxt } from './lib/security-txt.js';
 import { withSecurityHeaders } from './middleware/security-headers.js';
 
 export interface Env {
   PROJECT_VERSION: string;
+  // Minimum level the logger emits. Absent or unrecognised means info, so debug output
+  // is opt-in per deployment rather than something a code change can leak into production.
+  LOG_LEVEL?: string;
   // Error reporting (spec 08). Set with `wrangler secret put SENTRY_DSN`; unset = disabled.
   SENTRY_DSN?: string;
 {%- if 'kv' in bindings %}
@@ -51,7 +54,7 @@ export const handleRequest = (
   route: (request: Request, env: Env) => Response = handle,
 ): Response => {
   const version = env.PROJECT_VERSION || 'dev';
-  const logger = createLogger(version);
+  const logger = createLogger(version, toLogLevel(env.LOG_LEVEL));
   const requestId = crypto.randomUUID();
   const start = Date.now();
   const path = new URL(request.url).pathname;
@@ -85,7 +88,9 @@ const handler = {
 
   async scheduled(_event: ScheduledController, env: Env): Promise<void> {
     // Heartbeat stub (spec 08): ping healthchecks.io / emit a metric here.
-    createLogger(env.PROJECT_VERSION || 'dev').info({ event: 'cron_heartbeat' });
+    createLogger(env.PROJECT_VERSION || 'dev', toLogLevel(env.LOG_LEVEL)).info({
+      event: 'cron_heartbeat',
+    });
   },
 {%- endif %}
 } satisfies ExportedHandler<Env>;

@@ -27,5 +27,10 @@ Extra fields are allowed (the object is open) — but keep them queryable and ch
 - Request/response bodies of **auth or billing** routes.
 - Full request payloads (log the shape or the ids, not the contents).
 
-`debug` is intended for local development and is stripped in production builds. `warn` and
-`error` go to stderr; `info`/`debug` to stdout.
+`debug` is for local development. It is **filtered at runtime, not stripped at build time**:
+a logger drops anything below its minimum level, and the minimum defaults to `info`, so a
+`debug` call that ships still emits nothing until a deployment sets `LOG_LEVEL=debug`. The
+earlier wording here promised build-time stripping that no part of the pipeline performed —
+wrangler bundles with esbuild, which does not remove a call by log level.
+
+`warn` and `error` go to stderr; `info`/`debug` to stdout.

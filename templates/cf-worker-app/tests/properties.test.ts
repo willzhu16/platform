@@ -1,6 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { createLogger, formatLine, type LogFields } from '../src/lib/log.js';
+import { createLogger, formatLine, type LogFields, type LogLevel } from '../src/lib/log.js';
 import { buildSecurityTxt } from '../src/lib/security-txt.js';
 import { withSecurityHeaders } from '../src/middleware/security-headers.js';
 
@@ -76,7 +76,9 @@ describe('a log line is always one parseable line', () => {
         console.log = (line: unknown) => out.push(line);
         console.error = (line: unknown) => err.push(line);
         try {
-          createLogger('v1.0.0')[level](fields);
+          // 'debug' as the minimum on purpose: this property is about ROUTING, so every
+          // level has to actually reach a stream. Filtering is the property below.
+          createLogger('v1.0.0', 'debug')[level](fields);
         } finally {
           console.log = realLog;
           console.error = realError;
@@ -85,6 +87,31 @@ describe('a log line is always one parseable line', () => {
         const toStderr = level === 'warn' || level === 'error';
         expect(err).toHaveLength(toStderr ? 1 : 0);
         expect(out).toHaveLength(toStderr ? 0 : 1);
+      }),
+    );
+  });
+
+  it('emits a level if and only if it is at or above the minimum', () => {
+    // Stated as a rule over every (minimum, level) pair rather than the four cases someone
+    // thinks to write down. The failure this guards is a comparison that works for the
+    // pair you tested and inverts for one you did not.
+    const order: LogLevel[] = ['debug', 'info', 'warn', 'error'];
+    fc.assert(
+      fc.property(logLevel, logLevel, logFields, (minLevel, level, fields) => {
+        const lines: unknown[] = [];
+        const realLog = console.log;
+        const realError = console.error;
+        console.log = (line: unknown) => lines.push(line);
+        console.error = (line: unknown) => lines.push(line);
+        try {
+          createLogger('v1.0.0', minLevel)[level](fields);
+        } finally {
+          console.log = realLog;
+          console.error = realError;
+        }
+
+        const shouldEmit = order.indexOf(level) >= order.indexOf(minLevel);
+        expect(lines).toHaveLength(shouldEmit ? 1 : 0);
       }),
     );
   });
