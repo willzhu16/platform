@@ -21,6 +21,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROFILE="${1:-$(dirname "$SCRIPT_DIR")/security/sandbox/srt-settings.json}"
 problems=0
 
+# The profile stores home-relative paths as the literal text `~/...`, for the sandbox runtime
+# to resolve at launch. Comparisons here must use that same text, so the tilde is built from a
+# variable: written inline it would either be expanded by the shell before the comparison ever
+# happened, or flagged by shellcheck as an expansion that failed.
+HOME_PATH="~"
+
 fail() {
   printf 'FAIL  %s\n' "$1" >&2
   problems=$((problems + 1))
@@ -60,7 +66,7 @@ domains="$(read_list network.allowedDomains)"
 # docs single out: a session that can write them persists hooks or permission rules that run
 # UNSANDBOXED on the next launch, which turns one bad turn into a permanent foothold.
 for path in .claude/hooks .claude/settings.json .claude/commands .claude/skills .mcp.json \
-            .git/hooks .git/config '~/.claude/settings.json' '~/.bashrc'; do
+            .git/hooks .git/config "$HOME_PATH/.claude/settings.json" "$HOME_PATH/.bashrc"; do
   if has "$path" "$deny_write"; then
     ok "write denied: $path"
   else
@@ -74,12 +80,12 @@ for path in secrets .env; do
   has "$path" "$deny_write" && ok "write denied: $path" || fail "$path is not in denyWrite"
   has "$path" "$deny_read" && ok "read denied: $path" || fail "$path is not in denyRead"
 done
-for path in '~/.ssh' '~/.aws'; do
+for path in "$HOME_PATH/.ssh" "$HOME_PATH/.aws"; do
   has "$path" "$deny_read" && ok "read denied: $path" || fail "$path is not in denyRead"
 done
 
 # A single over-broad grant silently undoes every deny above it.
-for path in / '~' '~/' /home /etc ..; do
+for path in / "$HOME_PATH" "$HOME_PATH/" /home /etc ..; do
   if has "$path" "$allow_write"; then
     fail "allowWrite contains $path, which defeats the profile"
   fi
