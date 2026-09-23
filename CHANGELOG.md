@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.0](https://github.com/willzhu16/platform/compare/v1.11.0...v1.12.0) (2026-09-23)
+
+
+### Features
+
+* **security:** add a sandbox profile that is checked, not just written ([#54](https://github.com/willzhu16/platform/issues/54)) ([b2b7830](https://github.com/willzhu16/platform/commit/b2b78308a8b59fa80d6bb249450d75a6f7338fb7))
+
 ## [1.11.0](https://github.com/willzhu16/platform/compare/v1.10.0...v1.11.0) (2026-09-21)
 
 
