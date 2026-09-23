@@ -426,5 +426,57 @@ check "the handbook template's worked example satisfies the validator" 'ok' \
   "$(log_verdict "$(awk '/^## Example/{flag=1} flag' "$PLATFORM_ROOT/handbook/templates/session-log.md" \
       | sed -n '/^```/,/^```$/p' | sed '1d;$d')")"
 
+# --- sandbox profile ------------------------------------------------------------------
+# The profile is a list of claims about what an agent cannot reach. A claim that quietly
+# stops being true reads exactly like one that holds, so these assert the check itself
+# fails on the weakenings that matter — not just that the shipped profile passes today.
+SANDBOX_CHECK="$SCRIPT_DIR/sandbox-check.sh"
+SHIPPED_PROFILE="$PLATFORM_ROOT/security/sandbox/srt-settings.json"
+
+sandbox_verdict() { # $1=profile json -> ok | first FAIL line
+  local file="$TMP/profile-$RANDOM.json" out
+  printf '%s' "$1" > "$file"
+  if out="$(bash "$SANDBOX_CHECK" "$file" 2>&1)"; then
+    echo ok
+  else
+    printf '%s\n' "$out" | grep -m 1 '^FAIL' | sed 's/^FAIL  //'
+  fi
+}
+
+weakened() { # $1=node expression mutating `profile`
+  node -e "
+    const fs = require('node:fs');
+    const profile = JSON.parse(fs.readFileSync(process.argv[1], 'utf8'));
+    $1;
+    process.stdout.write(JSON.stringify(profile));
+  " "$SHIPPED_PROFILE"
+}
+
+check 'the shipped sandbox profile passes its own check' 'ok' \
+  "$(sandbox_verdict "$(cat "$SHIPPED_PROFILE")")"
+
+check 'a profile letting the agent rewrite its own hooks is rejected' \
+  'the agent could rewrite its own supervision: .claude/hooks is not in denyWrite' \
+  "$(sandbox_verdict "$(weakened "profile.filesystem.denyWrite = profile.filesystem.denyWrite.filter((p) => p !== '.claude/hooks')")")"
+
+check 'a profile that stops denying reads of secrets is rejected' \
+  'secrets is not in denyRead' \
+  "$(sandbox_verdict "$(weakened "profile.filesystem.denyRead = profile.filesystem.denyRead.filter((p) => p !== 'secrets')")")"
+
+check 'an over-broad write grant is rejected even with every deny intact' \
+  'allowWrite contains ~, which defeats the profile' \
+  "$(sandbox_verdict "$(weakened "profile.filesystem.allowWrite.push('~')")")"
+
+# An empty allowlist looks stricter and is actually broken: the session cannot start, and a
+# profile nobody can run protects nothing.
+check 'a profile with no reachable model API is rejected' \
+  'allowedDomains omits api.anthropic.com, so a session cannot start' \
+  "$(sandbox_verdict "$(weakened 'profile.network.allowedDomains = []')")"
+
+check 'the check exits non-zero on a weakened profile, since the exit code is the gate' \
+  'rejected' \
+  "$(printf '%s' "$(weakened "profile.filesystem.denyWrite = []")" > "$TMP/weak.json";
+     bash "$SANDBOX_CHECK" "$TMP/weak.json" >/dev/null 2>&1 && echo accepted || echo rejected)"
+
 printf '\n%d passed, %d failed\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]

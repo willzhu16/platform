@@ -1,0 +1,59 @@
+{
+  "network": {
+    "allowedDomains": [
+      "api.anthropic.com",
+      "claude.ai",
+      "platform.claude.com",
+      "statsig.anthropic.com",
+      "github.com",
+      "api.github.com",
+      "codeload.github.com",
+      "objects.githubusercontent.com",
+      "registry.npmjs.org",
+      "pypi.org",
+      "files.pythonhosted.org"
+    ],
+    "deniedDomains": []
+  },
+  "filesystem": {
+    "allowWrite": [
+      ".",
+      "/tmp",
+      "~/.claude",
+      "~/.claude.json",
+      "~/.cache",
+      "~/.npm",
+      "~/.local/share/pnpm",
+      "~/.local/share/uv"
+    ],
+    "denyWrite": [
+      ".git/hooks",
+      ".git/config",
+      ".mcp.json",
+      ".claude/settings.json",
+      ".claude/settings.local.json",
+      ".claude/hooks",
+      ".claude/commands",
+      ".claude/agents",
+      ".claude/skills",
+      ".codex",
+      "~/.claude/settings.json",
+      "~/.claude/hooks",
+      "~/.claude.json",
+      "~/.bashrc",
+      "~/.bash_profile",
+      "~/.profile",
+      "~/.zshrc",
+      "secrets",
+      ".env"
+    ],
+    "denyRead": [
+      "~/.ssh",
+      "~/.aws",
+      "~/.gnupg",
+      "secrets",
+      ".env"
+    ],
+    "allowRead": []
+  }
+}
