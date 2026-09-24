@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.13.0](https://github.com/willzhu16/platform/compare/v1.12.0...v1.13.0) (2026-09-24)
+
+
+### Features
+
+* **fleet:** report repos that never opted into the harness ([#56](https://github.com/willzhu16/platform/issues/56)) ([8763622](https://github.com/willzhu16/platform/commit/87636222e3aa78db8f1ffab330a34e0c8386eadd))
+
 ## [1.12.0](https://github.com/willzhu16/platform/compare/v1.11.0...v1.12.0) (2026-09-23)
 
 
