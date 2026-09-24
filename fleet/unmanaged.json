@@ -1,0 +1,18 @@
+{
+  "epoch": "2026-07-01",
+  "epochNote": "Artemis's first commit landed 2026-07-06 in athena and platform. A repo created before July 2026 was never a candidate for the harness, so scripts/fleet-audit.sh ignores it entirely. A repo created on or after this date must either be athena-managed or be acknowledged below, with a reason.",
+  "acknowledged": [
+    {
+      "repo": "athena",
+      "reason": "The instruction compiler itself. It has no .athena/config.json by design: `pnpm compile` with no argument fails with ENOENT on that path, which is the documented expectation, not a defect. A compiler that compiled itself would have to be fresh against its own output before it could be trusted to check anyone else's."
+    },
+    {
+      "repo": "platform",
+      "reason": "Publishes the reusable workflows, copier templates and security rules the fleet consumes, so it is the source of the harness rather than a consumer of it. It also has no package.json at its root, so the TypeScript stack layer athena would compile in has nothing to describe."
+    },
+    {
+      "repo": "artemis",
+      "reason": "The thin workspace repo. It tracks .gitignore plus owner-facing notes and holds no shippable code; athena and platform live inside its working directory as independent checkouts with their own remotes. There is no build, test or deploy surface here for the harness to gate."
+    }
+  ]
+}
