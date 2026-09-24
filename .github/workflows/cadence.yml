@@ -120,17 +120,18 @@ jobs:
         run: |
           set -o pipefail
           if [ -z "${GH_TOKEN:-}" ]; then
+            # No backticks in these strings: shellcheck reads one inside single quotes as an
+            # expression that will not expand (SC2016), and actionlint runs shellcheck over
+            # every run block. Four-space indentation is the code block instead.
             {
               echo '### fleet-audit skipped'
               echo
-              echo 'No `AUTOMATION_TOKEN` secret. It needs a token that can see private repos;'
+              echo 'No AUTOMATION_TOKEN secret. It needs a token that can see private repos;'
               echo 'auditing with a repo-scoped token reports a half fleet as a whole one.'
               echo
-              echo 'Run it locally instead, where `gh auth` already sees everything:'
+              echo 'Run it locally instead, where gh auth already sees everything:'
               echo
-              echo '```'
-              echo 'bash scripts/fleet-audit.sh'
-              echo '```'
+              echo '    bash scripts/fleet-audit.sh'
             } >>"$GITHUB_STEP_SUMMARY"
             exit 0
           fi
