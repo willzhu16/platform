@@ -45,7 +45,12 @@ service to run; the deploy target is GitHub itself.
   report-only by default, writes files and never commits/pushes/applies a ruleset — see
   `handbook/adopting-an-existing-repo.md`),
   `setup-machine.sh` (mutates the machine), `new-project.ps1` (thin WSL wrapper; D-20
-  bash-first). Their pure string-building logic lives in `lib.sh`, regression-tested by
+  bash-first), `sops-check.sh` (fails any file under `secrets/` that is not sops output;
+  runs as a STEP inside the `security / gitleaks` job, because a job of its own would be a
+  check name no ruleset requires and could fail while the PR stayed mergeable),
+  `sops-bootstrap.sh` (writes a real age recipient into a project's `.sops.yaml`; generates
+  a per-project key by default, `--recipient` reuses a shared one, and the private half is
+  never printed or committed). Their pure string-building logic lives in `lib.sh`, regression-tested by
   `tests.sh` (`bash scripts/tests.sh`; needs jq + python3/PyYAML — safe to run, touches
   nothing). Shellcheck + the tests are gated by selftest.
 - `security/` — `gitleaks.toml` (default rules + age key / GitHub PAT / CF token / ntfy

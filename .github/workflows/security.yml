@@ -54,14 +54,43 @@ jobs:
         run: |
           echo "repository=${{ job.workflow_repository }}" >> "$GITHUB_OUTPUT"
           echo "ref=${{ job.workflow_sha }}" >> "$GITHUB_OUTPUT"
-      - name: Fetch shared gitleaks config from platform
+      - name: Fetch shared gitleaks config and the secrets gate from platform
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: ${{ steps.platform.outputs.repository }}
           ref: ${{ steps.platform.outputs.ref }}
-          sparse-checkout: security/gitleaks.toml
+          sparse-checkout: |
+            security/gitleaks.toml
+            scripts/sops-check.sh
           sparse-checkout-cone-mode: false
           path: .artemis-platform
+      # A step in this job rather than a job of its own, on purpose. A new job means a new
+      # check name, and no ruleset requires it, so it could fail while the PR stayed
+      # mergeable — the gate would be decoration. `security / gitleaks` is already required
+      # everywhere, which is the same reason diff coverage lives inside `ci / test`.
+      #
+      # It runs BEFORE the scan because it is instant and needs no download, and because a
+      # plaintext secret committed under secrets/ is the more certain finding of the two:
+      # gitleaks infers from credential shapes, this reads whether the file is sops output.
+      - name: Verify every file under secrets/ is encrypted
+        id: sops
+        run: bash .artemis-platform/scripts/sops-check.sh .
+      - name: Unencrypted secret (on finding)
+        if: failure() && steps.sops.conclusion == 'failure'
+        run: |
+          {
+            echo '### 🔒 a file under secrets/ is not encrypted'
+            echo ''
+            echo 'It is plaintext in the working tree. If it has already been committed and'
+            echo 'pushed, treat the value as leaked: rotate it first, then purge history.'
+            echo ''
+            echo 'Encrypt in place, then commit the encrypted file:'
+            echo ''
+            echo '    sops -e -i secrets/<file>'
+            echo ''
+            echo 'If the recipient is still the template placeholder, configure it once with'
+            echo 'platform scripts/sops-bootstrap.sh and verify before committing.'
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Install gitleaks (verified against published checksums)
         run: |
           tarball="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
@@ -73,6 +102,7 @@ jobs:
           install -m 0755 gitleaks /usr/local/bin/gitleaks
           gitleaks version
       - name: Scan (PR = diff range; push = Git history)
+        id: scan
         run: |
           config=.artemis-platform/security/gitleaks.toml
           if [ "${{ github.event_name }}" = "pull_request" ]; then
@@ -81,8 +111,11 @@ jobs:
           else
             gitleaks detect --source . --config "$config" --redact --no-banner
           fi
+      # Scoped to the scan step: `failure()` alone also fires when the secrets gate above
+      # fails, and printing the gitleaks runbook for an unencrypted file sends the reader to
+      # the wrong procedure.
       - name: Leak-response runbook (on finding)
-        if: failure()
+        if: failure() && steps.scan.conclusion == 'failure'
         run: |
           {
             echo "### 🔑 gitleaks found a potential secret"
