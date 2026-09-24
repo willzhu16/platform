@@ -113,6 +113,8 @@ deletion, and requires linear history.
 - `handbook/` holds the process docs: definition of done, cadences, incident process,
   severity levels, log schema.
 - `.github/workflows/*.yml` each open with a header comment explaining their contract.
-  Read that header before changing one.
+  Read that header before changing one. `scripts/*.sh` document themselves the same way.
+- `fleet/unmanaged.json` lists the repos deliberately outside the harness and why.
+  `bash scripts/fleet-audit.sh` reports any repo that is neither managed nor listed.
 - `selftest.yml` runs on every PR, including documentation-only changes. There is no way to run
   these pipelines locally.
