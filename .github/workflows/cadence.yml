@@ -96,3 +96,43 @@ jobs:
               owner, repo, title, body, labels: ['cadence', cadence],
             });
             core.info(`opened #${data.number}: ${title}`);
+
+  # Nothing else in Artemis looks across repos. athena-sync.yml is a reusable workflow that
+  # each managed repo calls FOR ITSELF, so a project built without the harness is never
+  # examined by anything — launch-start has been unmanaged since 2026-07-04. Weekly only; the
+  # monthly and quarterly crons skip it.
+  #
+  # AUTOMATION_TOKEN, not github.token, and the difference is the whole reason for the guard
+  # below: 12 of the owner's 27 repos are private, including 4 of the 8 in scope and `artemis`,
+  # which fleet/unmanaged.json acknowledges. A repo-scoped token lists only public repos, so a
+  # run under one would drop most findings AND report acknowledged private repos as absent.
+  # Wrong in both directions is worse than not running, so without the secret this says so in
+  # the run summary and stops.
+  fleet-audit:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 6 * * 1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Report repos that should be athena-managed and are not
+        env:
+          GH_TOKEN: ${{ secrets.AUTOMATION_TOKEN }}
+        run: |
+          set -o pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            # No backticks in these strings: shellcheck reads one inside single quotes as an
+            # expression that will not expand (SC2016), and actionlint runs shellcheck over
+            # every run block. Four-space indentation is the code block instead.
+            {
+              echo '### fleet-audit skipped'
+              echo
+              echo 'No AUTOMATION_TOKEN secret. It needs a token that can see private repos;'
+              echo 'auditing with a repo-scoped token reports a half fleet as a whole one.'
+              echo
+              echo 'Run it locally instead, where gh auth already sees everything:'
+              echo
+              echo '    bash scripts/fleet-audit.sh'
+            } >>"$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          bash scripts/fleet-audit.sh | tee -a "$GITHUB_STEP_SUMMARY"

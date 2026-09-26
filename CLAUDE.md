@@ -45,9 +45,18 @@ service to run; the deploy target is GitHub itself.
   report-only by default, writes files and never commits/pushes/applies a ruleset — see
   `handbook/adopting-an-existing-repo.md`),
   `setup-machine.sh` (mutates the machine), `new-project.ps1` (thin WSL wrapper; D-20
-  bash-first). Their pure string-building logic lives in `lib.sh`, regression-tested by
+  bash-first), `fleet-audit.sh` (read-only; see `fleet/unmanaged.json` below).
+  Their pure string-building logic lives in `lib.sh`, regression-tested by
   `tests.sh` (`bash scripts/tests.sh`; needs jq + python3/PyYAML — safe to run, touches
   nothing). Shellcheck + the tests are gated by selftest.
+- `fleet/unmanaged.json` — the repos deliberately outside the harness, each with a reason,
+  plus the `epoch` that bounds the question (a repo created before Artemis existed was never
+  a candidate). `scripts/fleet-audit.sh` reports any repo in scope that is neither
+  athena-managed nor listed here, and reports a listed repo that has since been adopted.
+  Nothing else in Artemis looks across repos: `athena-sync.yml` is called by each managed
+  repo for itself. **The audit needs a token that can see private repos** — 12 of 27 are
+  private, so a repo-scoped `GITHUB_TOKEN` silently audits half a fleet. The weekly
+  `fleet-audit` job in `cadence.yml` skips itself when `AUTOMATION_TOKEN` is absent.
 - `security/` — `gitleaks.toml` (default rules + age key / GitHub PAT / CF token / ntfy
   custom rules) and the semgrep rules (`artemis-js/`, `artemis-python/`): 10 rules over
   `command-injection` + `workers` (D1 query interpolation, logging the whole `env`,
