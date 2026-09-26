@@ -91,7 +91,7 @@ jobs:
             echo "first**, then purge it from git history — never the reverse (public repos"
             echo "are scraped within minutes)."
             echo ""
-            echo "Runbook: \`https://github.com/willzhu16/platform/blob/v1/security/README.md\` (spec 06)."
+            echo "Runbook: https://github.com/willzhu16/platform/blob/v1/handbook/runbooks/leak-response.md"
           } >> "$GITHUB_STEP_SUMMARY"
 
   semgrep:

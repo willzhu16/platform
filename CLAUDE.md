@@ -60,7 +60,9 @@ service to run; the deploy target is GitHub itself.
 - `security/` — `gitleaks.toml` (default rules + age key / GitHub PAT / CF token / ntfy
   custom rules) and semgrep starter packs (`artemis-js/`, `artemis-python/`).
 - `handbook/` — cadences, definition-of-done, incident process, severity levels, frozen
-  log schema, and doc templates (ADR, postmortem, runbook, session-log).
+  log schema, doc templates (ADR, postmortem, runbook, session-log), and `runbooks/` —
+  currently one, `leak-response.md`, which is what `security.yml` links to when gitleaks
+  fires. Its "Last tested" note says which steps were actually rehearsed and which were not.
 - `rulesets/main.json` — branch ruleset applied to new repos; hardcodes the 7 required
   check names by literal string.
 - `renovate/default.json` — shared preset; isolates platform major bumps into their own PR.
@@ -90,7 +92,8 @@ service to run; the deploy target is GitHub itself.
 - Templates ship no lockfiles by design; `new-project.sh` generates them (CI installs are
   `--frozen`, so a missing lockfile means a red first PR).
 - `.sops.yaml` has a placeholder recipient: configure a project-specific age public key
-  before encrypting anything. Leak response is documented in `security/README.md`.
+  before encrypting anything. Leak response is documented in
+  `handbook/runbooks/leak-response.md`.
 - Each template contains its own thin `security.yml` *caller* — don't confuse those with
   the reusable `security.yml` at this repo's root.
 - **Both templates gate on more than coverage now.** `cf-worker-app` ships
