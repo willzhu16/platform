@@ -621,6 +621,124 @@ check 'no private key file is created when a recipient is supplied' \
      cp "$PLATFORM_ROOT/templates/cf-worker-app/.sops.yaml" "$root/.sops.yaml" &&
      bash "$SOPS_BOOTSTRAP" "$root" --recipient "$SOPS_VALID_RECIPIENT" >/dev/null 2>&1 &&
      { find "$root" -name '*.agekey' | grep -q . && echo found || echo none; })"
+# --- fleet audit ------------------------------------------------------------------------
+#
+# Only fleet_findings is exercised: it is the whole decision, and it takes the inventory on
+# stdin precisely so these tests need no network. fleet_inventory is the thin gh wrapper
+# around it and is not called here.
+
+# shellcheck source=scripts/fleet-audit.sh
+. "$SCRIPT_DIR/fleet-audit.sh"
+
+FLEET_FILE="$PLATFORM_ROOT/fleet/unmanaged.json"
+
+# Column padding is asserted once, on its own, below. Everywhere else the spaces are squeezed
+# so an assertion is about which repo was reported and why, not about a field width.
+fleet_verdict() { # $1=acknowledgement JSON text; inventory on stdin
+  printf '%s' "$1" >"$TMP/fleet.json"
+  fleet_findings "$TMP/fleet.json" | tr -s ' '
+}
+
+FLEET_ACK_PLATFORM='{"epoch":"2026-07-01",
+  "acknowledged":[{"repo":"platform","reason":"the source of the harness, not a consumer"}]}'
+FLEET_NO_ACK='{"epoch":"2026-07-01","acknowledged":[]}'
+
+# A roster acknowledging nothing, on disk, for the checks that are about the report itself
+# rather than about the committed file's contents. Pointing those at the real roster couples
+# them to it: an inventory omitting athena, platform or artemis draws three correct "absent
+# from the inventory" findings, which drown the assertion.
+printf '%s' "$FLEET_NO_ACK" >"$TMP/plain-fleet.json"
+
+echo '== fleet-audit (scripts/fleet-audit.sh)'
+
+check 'an in-scope repo with no config and no acknowledgement is a finding' \
+  'unmanaged memoria — created 2026-09-14, no .athena/config.json and no entry in fleet/unmanaged.json' \
+  "$(fleet_verdict "$FLEET_NO_ACK" <<<"$(printf 'memoria\t2026-09-14\tno\n')")"
+
+check 'a managed repo is not reported' \
+  '' \
+  "$(fleet_verdict "$FLEET_NO_ACK" <<<"$(printf 'canary-worker\t2026-07-12\tyes\n')")"
+
+# The narrowing that makes the audit usable at all: 19 of the owner's repos predate Artemis
+# and were never candidates. Without the epoch this check reports all of them and gets muted.
+check 'a repo created before the epoch is ignored even though it is unmanaged' \
+  '' \
+  "$(fleet_verdict "$FLEET_NO_ACK" <<<"$(printf 'FlappyBird\t2024-09-26\tno\n')")"
+
+# Boundary: the epoch is inclusive, so a repo created exactly on it is in scope. An off-by-one
+# here silently excuses whatever was created that day.
+check 'a repo created exactly on the epoch is in scope' \
+  'unmanaged same-day — created 2026-07-01, no .athena/config.json and no entry in fleet/unmanaged.json' \
+  "$(fleet_verdict "$FLEET_NO_ACK" <<<"$(printf 'same-day\t2026-07-01\tno\n')")"
+
+check 'the day before the epoch is out of scope' \
+  '' \
+  "$(fleet_verdict "$FLEET_NO_ACK" <<<"$(printf 'day-before\t2026-06-30\tno\n')")"
+
+check 'an acknowledged repo is not reported' \
+  '' \
+  "$(fleet_verdict "$FLEET_ACK_PLATFORM" <<<"$(printf 'platform\t2026-07-06\tno\n')")"
+
+check 'an acknowledged repo that has since been adopted is reported stale' \
+  'stale platform — acknowledged as unmanaged, but it now has .athena/config.json; remove the entry' \
+  "$(fleet_verdict "$FLEET_ACK_PLATFORM" <<<"$(printf 'platform\t2026-07-06\tyes\n')")"
+
+check 'an acknowledged repo missing from the inventory is reported without guessing why' \
+  'stale platform — acknowledged, but absent from the inventory: deleted, renamed, or invisible to this token' \
+  "$(fleet_verdict "$FLEET_ACK_PLATFORM" <<<"$(printf 'memoria\t2026-09-14\tyes\n')")"
+
+check 'an acknowledgement with no reason is rejected' \
+  'config gizmo — acknowledged with no reason; say why it stays outside the fleet' \
+  "$(fleet_verdict '{"epoch":"2026-07-01","acknowledged":[{"repo":"gizmo"}]}' \
+    <<<"$(printf 'gizmo\t2026-08-01\tno\n')")"
+
+# A reason pasted from an example and never filled in is the failure this guards: it reads as
+# a decision to whoever skims the file next.
+check 'an acknowledgement whose reason is still a placeholder is rejected' \
+  'config gizmo — reason is still a placeholder: <why it stays out>' \
+  "$(fleet_verdict '{"epoch":"2026-07-01","acknowledged":[{"repo":"gizmo","reason":"<why it stays out>"}]}' \
+    <<<"$(printf 'gizmo\t2026-08-01\tno\n')")"
+
+# An empty inventory is the dangerous case: a failed gh call produces no lines, and reporting
+# that as a clean fleet would be the audit claiming it checked something it never saw.
+check 'an empty inventory is reported, never treated as a clean fleet' \
+  'config inventory — no repos read — nothing was checked' \
+  "$(fleet_verdict "$FLEET_NO_ACK" </dev/null)"
+
+check 'an epoch that is not a date is rejected rather than compared as a string' \
+  'config '"$TMP"'/fleet.json — epoch "July 2026" is not a YYYY-MM-DD date' \
+  "$(fleet_verdict '{"epoch":"July 2026","acknowledged":[]}' \
+    <<<"$(printf 'gizmo\t2026-08-01\tno\n')")"
+
+check 'a fleet file with no epoch is rejected' \
+  'config '"$TMP"'/fleet.json — unreadable, or no "epoch" field: cannot tell which repos are in scope' \
+  "$(fleet_verdict '{"acknowledged":[]}' <<<"$(printf 'gizmo\t2026-08-01\tno\n')")"
+
+check 'a missing fleet file is reported rather than crashing the run' \
+  'config /nope/fleet.json — unreadable, or no "epoch" field: cannot tell which repos are in scope' \
+  "$(fleet_findings /nope/fleet.json <<<"$(printf 'gizmo\t2026-08-01\tno\n')" | tr -s ' ')"
+
+# The one assertion about the column format, so the tests above can squeeze padding without
+# leaving the report layout unpinned.
+check 'findings print as padded columns' \
+  'unmanaged gizmo' \
+  "$(fleet_findings "$TMP/plain-fleet.json" <<<"$(printf 'gizmo\t2026-08-01\tno\n')" | cut -c1-15)"
+
+# The committed file has to be well-formed and its entries live, or the audit's silence stops
+# meaning anything. Adopting athena, platform or artemis will fail this deliberately.
+check 'the committed fleet/unmanaged.json is well-formed and holds no stale entries' \
+  '' \
+  "$(fleet_findings "$FLEET_FILE" <<<"$(printf 'athena\t2026-07-06\tno\nplatform\t2026-07-06\tno\nartemis\t2026-07-06\tno\n')")"
+
+check 'the audit exits non-zero on a finding, since the exit code is the gate' \
+  'reported' \
+  "$(bash "$SCRIPT_DIR/fleet-audit.sh" --fleet-file "$TMP/plain-fleet.json" \
+    --inventory <(printf 'gizmo\t2026-08-01\tno\n') >/dev/null 2>&1 && echo clean || echo reported)"
+
+check 'the audit exits zero when every in-scope repo is managed' \
+  'clean' \
+  "$(bash "$SCRIPT_DIR/fleet-audit.sh" --fleet-file "$TMP/plain-fleet.json" \
+    --inventory <(printf 'canary-worker\t2026-07-12\tyes\n') >/dev/null 2>&1 && echo clean || echo reported)"
 
 printf '\n%d passed, %d failed\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]
