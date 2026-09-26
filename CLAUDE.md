@@ -58,7 +58,17 @@ service to run; the deploy target is GitHub itself.
   private, so a repo-scoped `GITHUB_TOKEN` silently audits half a fleet. The weekly
   `fleet-audit` job in `cadence.yml` skips itself when `AUTOMATION_TOKEN` is absent.
 - `security/` — `gitleaks.toml` (default rules + age key / GitHub PAT / CF token / ntfy
-  custom rules) and semgrep starter packs (`artemis-js/`, `artemis-python/`).
+  custom rules) and the semgrep rules (`artemis-js/`, `artemis-python/`): 10 rules over
+  `command-injection` + `workers` (D1 query interpolation, logging the whole `env`,
+  `Math.random` for a secret) and `command-injection` + `unsafe-input` (unsafe `yaml.load`,
+  `pickle.load`, `verify=False`). **These are the ONLY rules the fleet runs.**
+  `security.yml`'s `semgrep-config` input defaults to empty, so no registry pack
+  (`p/default`, `p/security-audit`) runs anywhere — breadth would be a decision about
+  vendoring versus fetching at scan time, and the monthly cadence assumes vendoring.
+  Every rule needs an annotated `ruleid:`/`ok:` fixture beside it, and both halves matter:
+  a rule with no fixture is untested, and a fixture with no `ok:` lines never proves the
+  rule stays off legitimate code. Run them locally with
+  `wsl uvx semgrep==1.168.0 --test --metrics=off security/semgrep` (~7 s, no install).
 - `handbook/` — cadences, definition-of-done, incident process, severity levels, frozen
   log schema, and doc templates (ADR, postmortem, runbook, session-log).
 - `rulesets/main.json` — branch ruleset applied to new repos; hardcodes the 7 required
