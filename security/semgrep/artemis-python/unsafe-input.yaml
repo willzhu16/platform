@@ -1,0 +1,73 @@
+rules:
+  # yaml.load with an unsafe loader constructs arbitrary Python objects, so a config file is
+  # an execution path. A py-tool CLI reading YAML config is the single most likely way this
+  # appears in the fleet, and safe_load is a drop-in replacement for it.
+  #
+  # PyYAML 6 made the Loader argument required, which helps, but FullLoader and UnsafeLoader
+  # are still accepted and still unsafe, so the rule names them rather than trusting the
+  # version pin.
+  - id: artemis-py-yaml-unsafe-load
+    message: >-
+      yaml.load with this loader can construct arbitrary Python objects, so parsing a file
+      becomes code execution. Use yaml.safe_load(), or Loader=yaml.SafeLoader.
+    languages: [python]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: "CWE-502: Deserialization of Untrusted Data"
+      references:
+        - https://pyyaml.org/wiki/PyYAMLDocumentation
+    patterns:
+      - pattern-either:
+          - pattern: yaml.load(...)
+          - pattern: yaml.unsafe_load(...)
+      - pattern-not: yaml.load(..., Loader=yaml.SafeLoader)
+      - pattern-not: yaml.load(..., Loader=yaml.CSafeLoader)
+
+  # pickle executes during deserialisation by design: there is no safe way to unpickle data
+  # you did not write yourself. Treated as ERROR rather than WARNING because the remedy is a
+  # format change, which is a decision worth forcing at review time rather than a tweak.
+  - id: artemis-py-pickle-load
+    message: >-
+      Unpickling executes code carried in the data, so this is remote code execution for any
+      input you did not produce yourself. Use json, or another format that cannot construct
+      objects.
+    languages: [python]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: "CWE-502: Deserialization of Untrusted Data"
+      references:
+        - https://docs.python.org/3/library/pickle.html
+    pattern-either:
+      - pattern: pickle.load(...)
+      - pattern: pickle.loads(...)
+
+  # verify=False disables certificate validation, which turns TLS into obfuscation: anything
+  # on the path can read and rewrite the traffic. It is almost always added to get past a
+  # certificate error during development and then committed.
+  #
+  # The session form is matched separately because `requests.$M(...)` cannot see a call on a
+  # Session object, and a session is how any CLI making more than one request is written.
+  - id: artemis-py-tls-verify-disabled
+    message: >-
+      verify=False disables TLS certificate validation, so the connection is readable and
+      modifiable by anything on the path. Fix the trust store instead, or pass verify with
+      the path to the CA bundle.
+    languages: [python]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: "CWE-295: Improper Certificate Validation"
+    pattern-either:
+      - pattern: requests.$METHOD(..., verify=False, ...)
+      - pattern: httpx.$METHOD(..., verify=False, ...)
+      # pattern-inside, not a bare sequence pattern: a sequence makes the session assignment
+      # part of the match, so semgrep reports the finding on the `requests.Session()` line
+      # instead of the call that actually disables validation. Same idiom the import matching
+      # in command-injection.yaml uses.
+      - patterns:
+          - pattern-inside: |
+              $SESSION = requests.Session()
+              ...
+          - pattern: $SESSION.$METHOD(..., verify=False, ...)
