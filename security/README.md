@@ -55,15 +55,19 @@ pinned and every rule change is a reviewable diff.
 ## When a gate fires
 
 A potential secret finding blocks publication until it is investigated. Do not paste the
-value into an issue, PR, chat, or scanner log.
+value into an issue, PR, chat, or scanner log — every scan command uses `--redact`.
 
-1. If genuine, revoke or rotate the credential at its issuer first and check access logs.
-   A public commit must be treated as exposed even if the branch was quickly deleted.
-2. Remove the value from the current source and replace it with a secret-store reference.
-3. Coordinate any history rewrite with the repository maintainer. Rewriting history is
-   disruptive and does not revoke copies held by forks, caches, or existing clones.
-4. Rescan current files and all fetched Git refs with redaction enabled, then verify the
-   replacement credential works without disclosing it.
+**Follow [`handbook/runbooks/leak-response.md`](../handbook/runbooks/leak-response.md).**
+It has the per-issuer revocation steps, the commands, and what a history rewrite does and
+does not fix. The shape of it:
+
+1. **Rotate at the issuer first.** Deleting the value does not un-leak it, and cleanup time
+   is time the credential still works.
+2. Replace the literal in the source with a secret-store reference.
+3. A history rewrite is optional and disruptive; rotation is what makes the value
+   worthless. It also does not reach forks, existing clones, or cached views.
+4. Rescan and confirm — note that a clean working-tree scan (`--no-git`) proves nothing
+   about history, which the runbook demonstrates.
 
 The Semgrep fixtures deliberately contain vulnerable examples for scanner regression
 coverage. They are not application code and must never be executed or copied into projects.
