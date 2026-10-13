@@ -107,7 +107,8 @@ jobs:
   # which fleet/unmanaged.json acknowledges. A repo-scoped token lists only public repos, so a
   # run under one would drop most findings AND report acknowledged private repos as absent.
   # Wrong in both directions is worse than not running, so without the secret this says so in
-  # the run summary and stops.
+  # the run summary and stops. A secret that is set but sees no private repo is the script's
+  # to catch: it prints a `config token` line and fails instead of auditing.
   fleet-audit:
     if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 6 * * 1'
     runs-on: ubuntu-latest
