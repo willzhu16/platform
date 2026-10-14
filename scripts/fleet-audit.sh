@@ -39,9 +39,9 @@
 # in scope and `artemis`, which is acknowledged below. A repo-scoped GITHUB_TOKEN lists only
 # public repos, so a run under one drops most of the real findings AND reports acknowledged
 # private repos as absent — wrong in both directions at once, which is worse than not running.
-# An interactive `gh auth login` is fine; in Actions it needs AUTOMATION_TOKEN, and that token
-# needs read access to every repo, not just the ones it opens PRs in. A token that lists no
-# private repo at all is refused with a `config token` line rather than audited.
+# An interactive `gh auth login` is fine; in Actions it needs FLEET_AUDIT_TOKEN, a read-only
+# token for every repo (see cadence.yml). A token that lists no private repo at all is refused
+# with a `config token` line rather than audited.
 #
 # The inventory is one repo per line, tab-separated:
 #

@@ -102,13 +102,18 @@ jobs:
   # examined by anything — launch-start has been unmanaged since 2026-07-04. Weekly only; the
   # monthly and quarterly crons skip it.
   #
-  # AUTOMATION_TOKEN, not github.token, and the difference is the whole reason for the guard
+  # FLEET_AUDIT_TOKEN, not github.token, and the difference is the whole reason for the guard
   # below: 12 of the owner's 27 repos are private, including 4 of the 8 in scope and `artemis`,
   # which fleet/unmanaged.json acknowledges. A repo-scoped token lists only public repos, so a
   # run under one would drop most findings AND report acknowledged private repos as absent.
   # Wrong in both directions is worse than not running, so without the secret this says so in
   # the run summary and stops. A secret that is set but sees no private repo is the script's
   # to catch: it prints a `config token` line and fails instead of auditing.
+  #
+  # Not AUTOMATION_TOKEN. That one opens release PRs, so it can write, and this job needs read
+  # access to every repo. Widening it would hand write access to all of them for a read-only
+  # report. Until 2026-10-13 this job did use it, and it could not see the private repos.
+  # FLEET_AUDIT_TOKEN is a fine-grained token: all repositories, Contents read-only.
   fleet-audit:
     if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 6 * * 1'
     runs-on: ubuntu-latest
@@ -117,7 +122,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Report repos that should be athena-managed and are not
         env:
-          GH_TOKEN: ${{ secrets.AUTOMATION_TOKEN }}
+          GH_TOKEN: ${{ secrets.FLEET_AUDIT_TOKEN }}
         run: |
           set -o pipefail
           if [ -z "${GH_TOKEN:-}" ]; then
@@ -127,7 +132,7 @@ jobs:
             {
               echo '### fleet-audit skipped'
               echo
-              echo 'No AUTOMATION_TOKEN secret. It needs a token that can see private repos;'
+              echo 'No FLEET_AUDIT_TOKEN secret. It needs a token that can see private repos;'
               echo 'auditing with a repo-scoped token reports a half fleet as a whole one.'
               echo
               echo 'Run it locally instead, where gh auth already sees everything:'
