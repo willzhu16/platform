@@ -583,10 +583,14 @@ check 'findings print as padded columns' \
   "$(fleet_findings "$TMP/plain-fleet.json" <<<"$(printf 'gizmo\t2026-08-01\tno\n')" | cut -c1-15)"
 
 # The committed file has to be well-formed and its entries live, or the audit's silence stops
-# meaning anything. Adopting athena, platform or artemis will fail this deliberately.
+# meaning anything. Adopting any repo listed in it will fail this deliberately.
+FLEET_ACKNOWLEDGED_INVENTORY="$(printf '%s\n' \
+  $'athena\t2026-07-06\tno' $'platform\t2026-07-06\tno' $'artemis\t2026-07-06\tno' \
+  $'launch-start\t2026-07-04\tno' $'memoria\t2026-09-14\tno' $'idea-scout\t2026-09-18\tno' \
+  $'animation_studio\t2026-07-17\tno')"
 check 'the committed fleet/unmanaged.json is well-formed and holds no stale entries' \
   '' \
-  "$(fleet_findings "$FLEET_FILE" <<<"$(printf 'athena\t2026-07-06\tno\nplatform\t2026-07-06\tno\nartemis\t2026-07-06\tno\n')")"
+  "$(fleet_findings "$FLEET_FILE" <<<"$FLEET_ACKNOWLEDGED_INVENTORY")"
 
 check 'the audit exits non-zero on a finding, since the exit code is the gate' \
   'reported' \
