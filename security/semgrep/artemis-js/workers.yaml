@@ -1,0 +1,73 @@
+rules:
+  # D1 is one of the bindings copier offers, and the template types it as `DB: D1Database`.
+  # The prepared-statement API exists precisely so a query never carries user data as text,
+  # and .bind() is one keystroke away, so an interpolated query here is always a mistake
+  # rather than a tradeoff.
+  #
+  # Matched on interpolation, not on "the argument is not a literal": `db.prepare(SELECT_USER)`
+  # with a module-level constant is the CORRECT pattern, and a rule that flagged it would be
+  # muted within a week. Verified against the fixture: a constant, a plain string and a
+  # template literal with no substitution all pass.
+  - id: artemis-js-d1-sql-interpolation
+    message: >-
+      This SQL string interpolates a value instead of binding it, which is SQL injection if
+      any part of it comes from a request. Use a placeholder and .bind():
+      db.prepare('SELECT ... WHERE id = ?').bind(id)
+    languages: [javascript, typescript]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: "CWE-89: Improper Neutralization of Special Elements used in an SQL Command"
+      references:
+        - https://developers.cloudflare.com/d1/worker-api/prepared-statements/
+    pattern-either:
+      - pattern: $DB.prepare(`...${...}...`)
+      - pattern: $DB.prepare($A + $B)
+
+  # In a Worker the `env` object IS the secret store: the template already types SENTRY_DSN on
+  # it, and `wrangler secret put` adds more. Logging it prints every one of them into a log
+  # sink, and the security layer's rule against logging secrets cannot be enforced by reading
+  # log call sites one at a time.
+  #
+  # Scoped to console.* and JSON.stringify on purpose. The template itself writes
+  # `route(request, { ...env, PROJECT_VERSION: version })`, which is correct, so a rule that
+  # flagged every spread of env would fail on the code it ships with.
+  - id: artemis-js-log-whole-env
+    message: >-
+      This logs or serialises the whole `env` object, which holds every secret bound to the
+      Worker (SENTRY_DSN, and anything added with `wrangler secret put`). Log the named
+      non-secret fields you actually need instead.
+    languages: [javascript, typescript]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: "CWE-532: Insertion of Sensitive Information into Log File"
+    pattern-either:
+      - pattern: console.$METHOD(..., env, ...)
+      - pattern: JSON.stringify(env, ...)
+
+  # Math.random() is not a CSPRNG. The Workers runtime ships crypto.randomUUID() and
+  # crypto.getRandomValues(), and the template already uses the former for its request id, so
+  # this guards a regression rather than fixing existing code.
+  #
+  # Gated on the NAME being secret-ish, because Math.random() for jitter, sampling or a retry
+  # delay is entirely fine and far more common. Deliberately no bare `id` in the pattern: it
+  # is a substring of identifier, video, hidden and width, and the false positives would sink
+  # the rule.
+  - id: artemis-js-math-random-secret
+    message: >-
+      Math.random() is not cryptographically secure, so it must not generate anything that
+      has to be unguessable. Use crypto.randomUUID(), or crypto.getRandomValues() for raw
+      bytes.
+    languages: [javascript, typescript]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: "CWE-338: Use of Cryptographically Weak Pseudo-Random Number Generator"
+    patterns:
+      - pattern: Math.random()
+      - pattern-inside: |
+          $NAME = ...
+      - metavariable-regex:
+          metavariable: $NAME
+          regex: (?i).*(token|secret|nonce|password|passwd|salt|session|apikey|api_key|csrf)

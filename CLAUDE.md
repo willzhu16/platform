@@ -65,7 +65,17 @@ service to run; the deploy target is GitHub itself.
   repositories, Contents read-only), skips itself when that is absent, and fails with a
   `config token` line when the token lists no private repo.
 - `security/` — `gitleaks.toml` (default rules + age key / GitHub PAT / CF token / ntfy
-  custom rules) and semgrep starter packs (`artemis-js/`, `artemis-python/`).
+  custom rules) and the semgrep rules (`artemis-js/`, `artemis-python/`): 10 rules over
+  `command-injection` + `workers` (D1 query interpolation, logging the whole `env`,
+  `Math.random` for a secret) and `command-injection` + `unsafe-input` (unsafe `yaml.load`,
+  `pickle.load`, `verify=False`). **These are the ONLY rules the fleet runs.**
+  `security.yml`'s `semgrep-config` input defaults to empty, so no registry pack
+  (`p/default`, `p/security-audit`) runs anywhere — breadth would be a decision about
+  vendoring versus fetching at scan time, and the monthly cadence assumes vendoring.
+  Every rule needs an annotated `ruleid:`/`ok:` fixture beside it, and both halves matter:
+  a rule with no fixture is untested, and a fixture with no `ok:` lines never proves the
+  rule stays off legitimate code. Run them locally with
+  `wsl uvx semgrep==1.168.0 --test --metrics=off security/semgrep` (~7 s, no install).
 - `handbook/` — cadences, definition-of-done, incident process, severity levels, frozen
   log schema, doc templates (ADR, postmortem, runbook, session-log), and `runbooks/` —
   currently one, `leak-response.md`, which is what `security.yml` links to when gitleaks
