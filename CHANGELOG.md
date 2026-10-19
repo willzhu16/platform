@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.13.0](https://github.com/willzhu16/platform/compare/v1.12.0...v1.13.0) (2026-10-19)
+
+
+### Features
+
+* **fleet:** report repos that never opted into the harness ([#56](https://github.com/willzhu16/platform/issues/56)) ([8763622](https://github.com/willzhu16/platform/commit/87636222e3aa78db8f1ffab330a34e0c8386eadd))
+* **security:** add Workers and Python semgrep rules with fixtures ([#59](https://github.com/willzhu16/platform/issues/59)) ([c3404ed](https://github.com/willzhu16/platform/commit/c3404edeca5d260168ae5a4d635da13365a65dbc))
+* **security:** fail any file under secrets/ that is not encrypted ([#57](https://github.com/willzhu16/platform/issues/57)) ([334853b](https://github.com/willzhu16/platform/commit/334853b97822c9593811a2a873c8e9b037138a63))
+
+
+### Bug Fixes
+
+* **biome:** point $schema at the installed package, not a pinned URL ([#61](https://github.com/willzhu16/platform/issues/61)) ([7f8600b](https://github.com/willzhu16/platform/commit/7f8600b8da8edd661c950bc105934323bda0600c))
+* **fleet:** stop the weekly audit reporting half the fleet ([#67](https://github.com/willzhu16/platform/issues/67)) ([c808d50](https://github.com/willzhu16/platform/commit/c808d508a384e99ae31c9136495f21d244cdce03))
+
 ## [1.12.0](https://github.com/willzhu16/platform/compare/v1.11.0...v1.12.0) (2026-09-23)
 
 
