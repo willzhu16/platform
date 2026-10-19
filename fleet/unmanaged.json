@@ -13,6 +13,22 @@
     {
       "repo": "artemis",
       "reason": "The thin workspace repo. It tracks .gitignore plus owner-facing notes and holds no shippable code; athena and platform live inside its working directory as independent checkouts with their own remotes. There is no build, test or deploy surface here for the harness to gate."
+    },
+    {
+      "repo": "launch-start",
+      "reason": "Owner decision, 2026-10-13: it does not need the harness and has to stay lean. Adopting it would add compiled instructions, a permission profile and a weekly sync job to an Astro project meant to stay small."
+    },
+    {
+      "repo": "memoria",
+      "reason": "Owner decision, 2026-10-13: an iOS app. athena has no target layer for a mobile app; its targets are Cloudflare Workers and VS Code extensions."
+    },
+    {
+      "repo": "idea-scout",
+      "reason": "Owner decision, 2026-10-13: already live, and it stays as it is rather than being brought under the harness after the fact."
+    },
+    {
+      "repo": "animation_studio",
+      "reason": "Owner decision, 2026-10-13: a completely different kind of project from the fleet's apps, so the harness does not apply to it."
     }
   ]
 }
