@@ -1,8 +1,14 @@
 # SOPS encryption rules. Encrypt files under secrets/ before committing them.
 #
-# Replace the placeholder with this project's age public recipient before use.
-# Until encryption is configured and verified, do not commit files under secrets/.
-# Pattern-based secret scanners cannot prove that a file contains no sensitive values.
+# The recipient below is a PLACEHOLDER and cannot encrypt anything. Configure it once, from a
+# platform checkout, before putting a real value under secrets/:
+#
+#   bash scripts/sops-bootstrap.sh <path to this repo>                     # new key for this project
+#   bash scripts/sops-bootstrap.sh <path to this repo> --recipient age1... # a key you already hold
+#
+# That writes the recipient here, keeps the private half out of the repo, and proves sops can
+# encrypt before it finishes. The `security / gitleaks` job then fails any file under secrets/
+# that is not sops output, so an unencrypted commit is caught rather than trusted not to happen.
 creation_rules:
   - path_regex: secrets/.*\.(env|json|yaml)$
     age: age1PLACEHOLDER0000000000000000000000000000000000000000000000000000

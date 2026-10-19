@@ -45,8 +45,13 @@ service to run; the deploy target is GitHub itself.
   report-only by default, writes files and never commits/pushes/applies a ruleset — see
   `handbook/adopting-an-existing-repo.md`),
   `setup-machine.sh` (mutates the machine), `new-project.ps1` (thin WSL wrapper; D-20
-  bash-first), `fleet-audit.sh` (read-only; see `fleet/unmanaged.json` below).
-  Their pure string-building logic lives in `lib.sh`, regression-tested by
+  bash-first), `fleet-audit.sh` (read-only; see `fleet/unmanaged.json` below),
+  `sops-check.sh` (fails any file under `secrets/` that is not sops output; runs as a STEP
+  inside the `security / gitleaks` job, because a job of its own would be a check name no
+  ruleset requires and could fail while the PR stayed mergeable), `sops-bootstrap.sh`
+  (writes a real age recipient into a project's `.sops.yaml`; generates a per-project key by
+  default, `--recipient` reuses a shared one, and the private half is never printed or
+  committed). Their pure string-building logic lives in `lib.sh`, regression-tested by
   `tests.sh` (`bash scripts/tests.sh`; needs jq + python3/PyYAML — safe to run, touches
   nothing). Shellcheck + the tests are gated by selftest.
 - `fleet/unmanaged.json` — the repos deliberately outside the harness, each with a reason,
@@ -56,7 +61,9 @@ service to run; the deploy target is GitHub itself.
   Nothing else in Artemis looks across repos: `athena-sync.yml` is called by each managed
   repo for itself. **The audit needs a token that can see private repos** — 12 of 27 are
   private, so a repo-scoped `GITHUB_TOKEN` silently audits half a fleet. The weekly
-  `fleet-audit` job in `cadence.yml` skips itself when `AUTOMATION_TOKEN` is absent.
+  `fleet-audit` job in `cadence.yml` reads `FLEET_AUDIT_TOKEN` (fine-grained, all
+  repositories, Contents read-only), skips itself when that is absent, and fails with a
+  `config token` line when the token lists no private repo.
 - `security/` — `gitleaks.toml` (default rules + age key / GitHub PAT / CF token / ntfy
   custom rules) and the semgrep rules (`artemis-js/`, `artemis-python/`): 10 rules over
   `command-injection` + `workers` (D1 query interpolation, logging the whole `env`,
@@ -70,7 +77,9 @@ service to run; the deploy target is GitHub itself.
   rule stays off legitimate code. Run them locally with
   `wsl uvx semgrep==1.168.0 --test --metrics=off security/semgrep` (~7 s, no install).
 - `handbook/` — cadences, definition-of-done, incident process, severity levels, frozen
-  log schema, and doc templates (ADR, postmortem, runbook, session-log).
+  log schema, doc templates (ADR, postmortem, runbook, session-log), and `runbooks/` —
+  currently one, `leak-response.md`, which is what `security.yml` links to when gitleaks
+  fires. Its "Last tested" note says which steps were actually rehearsed and which were not.
 - `rulesets/main.json` — branch ruleset applied to new repos; hardcodes the 7 required
   check names by literal string.
 - `renovate/default.json` — shared preset; isolates platform major bumps into their own PR.
@@ -100,7 +109,8 @@ service to run; the deploy target is GitHub itself.
 - Templates ship no lockfiles by design; `new-project.sh` generates them (CI installs are
   `--frozen`, so a missing lockfile means a red first PR).
 - `.sops.yaml` has a placeholder recipient: configure a project-specific age public key
-  before encrypting anything. Leak response is documented in `security/README.md`.
+  before encrypting anything. Leak response is documented in
+  `handbook/runbooks/leak-response.md`.
 - Each template contains its own thin `security.yml` *caller* — don't confuse those with
   the reusable `security.yml` at this repo's root.
 - **Both templates gate on more than coverage now.** `cf-worker-app` ships

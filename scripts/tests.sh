@@ -479,11 +479,153 @@ check 'the check exits non-zero on a weakened profile, since the exit code is th
      bash "$SANDBOX_CHECK" "$TMP/weak.json" >/dev/null 2>&1 && echo accepted || echo rejected)"
 
 
+# --- secrets/ encryption gate ------------------------------------------------------------
+#
+# sops_findings needs no sops and no age: it reads files. That is deliberate, because the
+# check ships into every repo in the fleet through the reusable security workflow, including
+# repos that never installed either tool.
+
+# shellcheck source=scripts/sops-check.sh
+. "$SCRIPT_DIR/sops-check.sh"
+
+SOPS_BOOTSTRAP="$SCRIPT_DIR/sops-bootstrap.sh"
+# A structurally valid age public key: "age1" plus 58 bech32 characters, 62 in total.
+SOPS_VALID_RECIPIENT='age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p'
+
+# Build a throwaway project. $1 names it; the rest are "path:content" pairs under secrets/.
+sops_fixture() { # $1=name, $2...=relative-path:content
+  local name="$1"; shift
+  local root="$TMP/sops-$name"
+  rm -rf "$root"
+  mkdir -p "$root/secrets"
+  local pair path
+  for pair in "$@"; do
+    path="$root/${pair%%:*}"
+    mkdir -p "$(dirname "$path")"
+    printf '%s\n' "${pair#*:}" >"$path"
+  done
+  printf '%s\n' "$root"
+}
+
+echo '== secrets/ encryption gate (scripts/sops-check.sh)'
+
+check 'a repo with no secrets/ directory has nothing to report' \
+  '' \
+  "$(mkdir -p "$TMP/sops-bare" && sops_findings "$TMP/sops-bare")"
+
+check 'an unencrypted file under secrets/ is reported' \
+  'unencrypted secrets/dev.env — encrypt in place before committing: sops -e -i secrets/dev.env' \
+  "$(sops_findings "$(sops_fixture plain 'secrets/dev.env:API_KEY=hunter2')")"
+
+check 'a SOPS-encrypted file is accepted' \
+  '' \
+  "$(sops_findings "$(sops_fixture enc 'secrets/dev.env:API_KEY=ENC[AES256_GCM,data:xx,type:str]')")"
+
+# These three are structure, not secrets. Requiring them to be encrypted would make the
+# template's own secrets/README.md fail the gate it ships with.
+check 'README.md, .gitignore and .gitkeep are not required to be encrypted' \
+  '' \
+  "$(sops_findings "$(sops_fixture exempt 'secrets/README.md:# secrets' \
+    'secrets/.gitignore:*.tmp' 'secrets/.gitkeep:')")"
+
+check 'a file in a subdirectory of secrets/ is checked too' \
+  'unencrypted secrets/preview/api.env — encrypt in place before committing: sops -e -i secrets/preview/api.env' \
+  "$(sops_findings "$(sops_fixture nested 'secrets/preview/api.env:TOKEN=abc')")"
+
+# grep -F, not grep: the marker contains a bracket, and as a pattern "ENC[AES256_GCM" is an
+# unterminated character class. Matched as a regex this file would be accepted or the grep
+# would error out, and either way an unencrypted secret would pass.
+check 'the ciphertext marker is matched literally, so a near-miss is still unencrypted' \
+  'unencrypted secrets/dev.env — encrypt in place before committing: sops -e -i secrets/dev.env' \
+  "$(sops_findings "$(sops_fixture nearmiss 'secrets/dev.env:API_KEY=ENCxAES256_GCM,data:xx')")"
+
+check 'the placeholder recipient is reported when something needs encrypting' \
+  'unencrypted secrets/dev.env — encrypt in place before committing: sops -e -i secrets/dev.env
+unconfigured .sops.yaml — recipient is still the template placeholder, so sops -e cannot run; fix with scripts/sops-bootstrap.sh' \
+  "$(root="$(sops_fixture unconfigured 'secrets/dev.env:API_KEY=hunter2')" &&
+     cp "$PLATFORM_ROOT/templates/cf-worker-app/.sops.yaml" "$root/.sops.yaml" &&
+     sops_findings "$root")"
+
+# A repo straight out of the template must be silent. The placeholder is not a defect until
+# there is a secret it cannot encrypt, and a gate that fires on every new project gets muted.
+check 'a freshly generated repo with only README.md is silent despite the placeholder' \
+  '' \
+  "$(root="$(sops_fixture fresh 'secrets/README.md:# secrets')" &&
+     cp "$PLATFORM_ROOT/templates/cf-worker-app/.sops.yaml" "$root/.sops.yaml" &&
+     sops_findings "$root")"
+
+check 'the committed cf-worker-app template passes its own gate' \
+  'PASS  secrets/ holds no files to encrypt' \
+  "$(bash "$SCRIPT_DIR/sops-check.sh" "$PLATFORM_ROOT/templates/cf-worker-app")"
+
+# The PASS wording distinguishes "checked files, all encrypted" from "found nothing to check".
+# Identical wording would let a rename that empties secrets/ report success unchanged.
+check 'a pass over an empty store does not claim it verified files' \
+  'PASS  secrets/ holds no files to encrypt' \
+  "$(bash "$SCRIPT_DIR/sops-check.sh" "$(sops_fixture empty 'secrets/README.md:# r')")"
+
+check 'a pass over a populated store says how many files it verified' \
+  'PASS  2 file(s) under secrets/ are SOPS-encrypted' \
+  "$(bash "$SCRIPT_DIR/sops-check.sh" "$(sops_fixture counted \
+    'secrets/README.md:# r' 'secrets/a.env:K=ENC[AES256_GCM,data:x]' \
+    'secrets/b.env:K=ENC[AES256_GCM,data:y]')")"
+
+check 'the check exits non-zero on an unencrypted file, since the exit code is the gate' \
+  'rejected' \
+  "$(bash "$SCRIPT_DIR/sops-check.sh" "$(sops_fixture exitcode 'secrets/dev.env:K=v')" \
+    >/dev/null 2>&1 && echo accepted || echo rejected)"
+
+echo '== sops bootstrap (scripts/sops-bootstrap.sh)'
+
+# The whole point of --recipient: it is how a shared key gets used deliberately, without one
+# being committed to a public template where everybody would hold the private half.
+check 'a valid recipient replaces the placeholder and leaves the rules intact' \
+  "    age: $SOPS_VALID_RECIPIENT|  - path_regex: secrets/.*\\.(env|json|yaml)\$" \
+  "$(root="$(sops_fixture boot 'secrets/README.md:# r')" &&
+     cp "$PLATFORM_ROOT/templates/cf-worker-app/.sops.yaml" "$root/.sops.yaml" &&
+     bash "$SOPS_BOOTSTRAP" "$root" --recipient "$SOPS_VALID_RECIPIENT" >/dev/null 2>&1 &&
+     printf '%s|%s' "$(grep 'age:' "$root/.sops.yaml")" "$(grep 'path_regex' "$root/.sops.yaml")")"
+
+check 'a recipient of the wrong length is refused before anything is written' \
+  'refused' \
+  "$(root="$(sops_fixture shortkey 'secrets/README.md:# r')" &&
+     cp "$PLATFORM_ROOT/templates/cf-worker-app/.sops.yaml" "$root/.sops.yaml" &&
+     { bash "$SOPS_BOOTSTRAP" "$root" --recipient age1short >/dev/null 2>&1 \
+       && echo accepted || echo refused; })"
+
+# b, i, o and 1 are not in the bech32 alphabet, so a key containing one is a typo. Catching it
+# here matters because the failure otherwise surfaces as files nobody can decrypt.
+check 'a recipient with a non-bech32 character is refused' \
+  'refused' \
+  "$(root="$(sops_fixture badchar 'secrets/README.md:# r')" &&
+     cp "$PLATFORM_ROOT/templates/cf-worker-app/.sops.yaml" "$root/.sops.yaml" &&
+     { bash "$SOPS_BOOTSTRAP" "$root" --recipient \
+       age1bl3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p >/dev/null 2>&1 \
+       && echo accepted || echo refused; })"
+
+check 'passing both a recipient and a key path is refused rather than reporting a phantom file' \
+  'refused' \
+  "$(root="$(sops_fixture bothflags 'secrets/README.md:# r')" &&
+     cp "$PLATFORM_ROOT/templates/cf-worker-app/.sops.yaml" "$root/.sops.yaml" &&
+     { bash "$SOPS_BOOTSTRAP" "$root" --recipient "$SOPS_VALID_RECIPIENT" \
+       --key-out "$TMP/never.agekey" >/dev/null 2>&1 && echo accepted || echo refused; })"
+
+check 'a directory with no .sops.yaml is refused' \
+  'refused' \
+  "$(bash "$SOPS_BOOTSTRAP" "$(sops_fixture nosops 'secrets/README.md:# r')" \
+    --recipient "$SOPS_VALID_RECIPIENT" >/dev/null 2>&1 && echo accepted || echo refused)"
+
+check 'no private key file is created when a recipient is supplied' \
+  'none' \
+  "$(root="$(sops_fixture nokey 'secrets/README.md:# r')" &&
+     cp "$PLATFORM_ROOT/templates/cf-worker-app/.sops.yaml" "$root/.sops.yaml" &&
+     bash "$SOPS_BOOTSTRAP" "$root" --recipient "$SOPS_VALID_RECIPIENT" >/dev/null 2>&1 &&
+     { find "$root" -name '*.agekey' | grep -q . && echo found || echo none; })"
 # --- fleet audit ------------------------------------------------------------------------
 #
-# Only fleet_findings is exercised: it is the whole decision, and it takes the inventory on
-# stdin precisely so these tests need no network. fleet_inventory is the thin gh wrapper
-# around it and is not called here.
+# fleet_findings carries most of these: it is the whole decision, and it takes the inventory
+# on stdin precisely so these tests need no network. The token guard sits on the gh path
+# instead, so its two checks at the end swap gh for a function.
 
 # shellcheck source=scripts/fleet-audit.sh
 . "$SCRIPT_DIR/fleet-audit.sh"
@@ -583,10 +725,14 @@ check 'findings print as padded columns' \
   "$(fleet_findings "$TMP/plain-fleet.json" <<<"$(printf 'gizmo\t2026-08-01\tno\n')" | cut -c1-15)"
 
 # The committed file has to be well-formed and its entries live, or the audit's silence stops
-# meaning anything. Adopting athena, platform or artemis will fail this deliberately.
+# meaning anything. Adopting any repo listed in it will fail this deliberately.
+FLEET_ACKNOWLEDGED_INVENTORY="$(printf '%s\n' \
+  $'athena\t2026-07-06\tno' $'platform\t2026-07-06\tno' $'artemis\t2026-07-06\tno' \
+  $'launch-start\t2026-07-04\tno' $'memoria\t2026-09-14\tno' $'idea-scout\t2026-09-18\tno' \
+  $'animation_studio\t2026-07-17\tno')"
 check 'the committed fleet/unmanaged.json is well-formed and holds no stale entries' \
   '' \
-  "$(fleet_findings "$FLEET_FILE" <<<"$(printf 'athena\t2026-07-06\tno\nplatform\t2026-07-06\tno\nartemis\t2026-07-06\tno\n')")"
+  "$(fleet_findings "$FLEET_FILE" <<<"$FLEET_ACKNOWLEDGED_INVENTORY")"
 
 check 'the audit exits non-zero on a finding, since the exit code is the gate' \
   'reported' \
@@ -597,6 +743,35 @@ check 'the audit exits zero when every in-scope repo is managed' \
   'clean' \
   "$(bash "$SCRIPT_DIR/fleet-audit.sh" --fleet-file "$TMP/plain-fleet.json" \
     --inventory <(printf 'canary-worker\t2026-07-12\tyes\n') >/dev/null 2>&1 && echo clean || echo reported)"
+
+# The token guard lives in the gh path, so these run fleet_audit_main against a stand-in for
+# gh. It lists one public repo, gizmo, in scope and unmanaged, and answers a request for
+# private repos with $1. Only the findings are kept; the summary line after them is not the
+# subject here.
+fleet_audit_with_gh() { # $1=private repo names the token can see, one per line
+  local fake_private_repos="$1"
+  (
+    gh() {
+      case "$*" in
+        'repo list '*'--visibility private'*) printf '%s\n' "$fake_private_repos" ;;
+        'repo list '*) printf 'gizmo\t2026-08-01\n' ;;
+        *) return 1 ;;
+      esac
+    }
+    fleet_audit_main --fleet-file "$TMP/plain-fleet.json" | sed '/^$/,$d' | tr -s ' '
+  )
+}
+
+# Regression: the weekly job ran on 2026-09-28, 10-05 and 10-12 under a token that could not
+# see private repos. It reported launch-start, missed the three private repos in the same state,
+# and called the private `artemis` entry stale. The audit has to refuse, not half-report.
+check 'a token that sees no private repo stops the audit instead of reporting half the fleet' \
+  'config token — lists no private repos for willzhu16: an audit under it would see only the public half of the fleet' \
+  "$(fleet_audit_with_gh '')"
+
+check 'a token that sees private repos runs the audit' \
+  'unmanaged gizmo — created 2026-08-01, no .athena/config.json and no entry in fleet/unmanaged.json' \
+  "$(fleet_audit_with_gh 'memoria')"
 
 printf '\n%d passed, %d failed\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]
