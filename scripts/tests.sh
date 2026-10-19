@@ -481,9 +481,9 @@ check 'the check exits non-zero on a weakened profile, since the exit code is th
 
 # --- fleet audit ------------------------------------------------------------------------
 #
-# Only fleet_findings is exercised: it is the whole decision, and it takes the inventory on
-# stdin precisely so these tests need no network. fleet_inventory is the thin gh wrapper
-# around it and is not called here.
+# fleet_findings carries most of these: it is the whole decision, and it takes the inventory
+# on stdin precisely so these tests need no network. The token guard sits on the gh path
+# instead, so its two checks at the end swap gh for a function.
 
 # shellcheck source=scripts/fleet-audit.sh
 . "$SCRIPT_DIR/fleet-audit.sh"
@@ -583,10 +583,14 @@ check 'findings print as padded columns' \
   "$(fleet_findings "$TMP/plain-fleet.json" <<<"$(printf 'gizmo\t2026-08-01\tno\n')" | cut -c1-15)"
 
 # The committed file has to be well-formed and its entries live, or the audit's silence stops
-# meaning anything. Adopting athena, platform or artemis will fail this deliberately.
+# meaning anything. Adopting any repo listed in it will fail this deliberately.
+FLEET_ACKNOWLEDGED_INVENTORY="$(printf '%s\n' \
+  $'athena\t2026-07-06\tno' $'platform\t2026-07-06\tno' $'artemis\t2026-07-06\tno' \
+  $'launch-start\t2026-07-04\tno' $'memoria\t2026-09-14\tno' $'idea-scout\t2026-09-18\tno' \
+  $'animation_studio\t2026-07-17\tno')"
 check 'the committed fleet/unmanaged.json is well-formed and holds no stale entries' \
   '' \
-  "$(fleet_findings "$FLEET_FILE" <<<"$(printf 'athena\t2026-07-06\tno\nplatform\t2026-07-06\tno\nartemis\t2026-07-06\tno\n')")"
+  "$(fleet_findings "$FLEET_FILE" <<<"$FLEET_ACKNOWLEDGED_INVENTORY")"
 
 check 'the audit exits non-zero on a finding, since the exit code is the gate' \
   'reported' \
@@ -597,6 +601,35 @@ check 'the audit exits zero when every in-scope repo is managed' \
   'clean' \
   "$(bash "$SCRIPT_DIR/fleet-audit.sh" --fleet-file "$TMP/plain-fleet.json" \
     --inventory <(printf 'canary-worker\t2026-07-12\tyes\n') >/dev/null 2>&1 && echo clean || echo reported)"
+
+# The token guard lives in the gh path, so these run fleet_audit_main against a stand-in for
+# gh. It lists one public repo, gizmo, in scope and unmanaged, and answers a request for
+# private repos with $1. Only the findings are kept; the summary line after them is not the
+# subject here.
+fleet_audit_with_gh() { # $1=private repo names the token can see, one per line
+  local fake_private_repos="$1"
+  (
+    gh() {
+      case "$*" in
+        'repo list '*'--visibility private'*) printf '%s\n' "$fake_private_repos" ;;
+        'repo list '*) printf 'gizmo\t2026-08-01\n' ;;
+        *) return 1 ;;
+      esac
+    }
+    fleet_audit_main --fleet-file "$TMP/plain-fleet.json" | sed '/^$/,$d' | tr -s ' '
+  )
+}
+
+# Regression: the weekly job ran on 2026-09-28, 10-05 and 10-12 under a token that could not
+# see private repos. It reported launch-start, missed the three private repos in the same state,
+# and called the private `artemis` entry stale. The audit has to refuse, not half-report.
+check 'a token that sees no private repo stops the audit instead of reporting half the fleet' \
+  'config token — lists no private repos for willzhu16: an audit under it would see only the public half of the fleet' \
+  "$(fleet_audit_with_gh '')"
+
+check 'a token that sees private repos runs the audit' \
+  'unmanaged gizmo — created 2026-08-01, no .athena/config.json and no entry in fleet/unmanaged.json' \
+  "$(fleet_audit_with_gh 'memoria')"
 
 printf '\n%d passed, %d failed\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]

@@ -56,7 +56,9 @@ service to run; the deploy target is GitHub itself.
   Nothing else in Artemis looks across repos: `athena-sync.yml` is called by each managed
   repo for itself. **The audit needs a token that can see private repos** — 12 of 27 are
   private, so a repo-scoped `GITHUB_TOKEN` silently audits half a fleet. The weekly
-  `fleet-audit` job in `cadence.yml` skips itself when `AUTOMATION_TOKEN` is absent.
+  `fleet-audit` job in `cadence.yml` reads `FLEET_AUDIT_TOKEN` (fine-grained, all
+  repositories, Contents read-only), skips itself when that is absent, and fails with a
+  `config token` line when the token lists no private repo.
 - `security/` — `gitleaks.toml` (default rules + age key / GitHub PAT / CF token / ntfy
   custom rules) and semgrep starter packs (`artemis-js/`, `artemis-python/`).
 - `handbook/` — cadences, definition-of-done, incident process, severity levels, frozen

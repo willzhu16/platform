@@ -39,7 +39,9 @@
 # in scope and `artemis`, which is acknowledged below. A repo-scoped GITHUB_TOKEN lists only
 # public repos, so a run under one drops most of the real findings AND reports acknowledged
 # private repos as absent — wrong in both directions at once, which is worse than not running.
-# An interactive `gh auth login` is fine; in Actions it needs AUTOMATION_TOKEN.
+# An interactive `gh auth login` is fine; in Actions it needs FLEET_AUDIT_TOKEN, a read-only
+# token for every repo (see cadence.yml). A token that lists no private repo at all is refused
+# with a `config token` line rather than audited.
 #
 # The inventory is one repo per line, tab-separated:
 #
@@ -217,6 +219,19 @@ fleet_audit_main() {
       # No usable epoch means no way to decide scope, so skip the API calls entirely and let
       # fleet_findings report the broken file.
       findings="$(fleet_findings "$fleet_file" </dev/null)"
+    elif [ -z "$(gh repo list "$owner" --visibility private --limit 1 --json name --jq '.[].name')" ]; then
+      # The header's warning, enforced. Checking that a token is SET is not enough: the weekly
+      # job ran under an AUTOMATION_TOKEN that could not see the private repos, and on
+      # 2026-09-28, 10-05 and 10-12 it reported one unmanaged repo of four and called
+      # `artemis` stale.
+      #
+      # One visible private repo is a floor, not proof. A token granted only some of them still
+      # passes. GET /user could say how many there should be, but it returned null private
+      # repo counts for a full-access token without the `user` scope, so it is no basis for a
+      # check. An owner with no private repos at all is refused too, which costs nothing on a
+      # fleet where 12 of 27 are private.
+      findings="$(fleet_report_line config token \
+        "lists no private repos for $owner: an audit under it would see only the public half of the fleet")"
     else
       findings="$(jq -r '.acknowledged[]?.repo // empty' "$fleet_file" \
         | fleet_inventory "$owner" "$epoch" \
