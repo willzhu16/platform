@@ -83,6 +83,8 @@ service to run; the deploy target is GitHub itself.
 - `rulesets/main.json` — branch ruleset applied to new repos; hardcodes the 7 required
   check names by literal string.
 - `renovate/default.json` — shared preset; isolates platform major bumps into their own PR.
+  The lock file refresh and the non-major batch automerge when green (majors never do), and
+  npm/PyPI releases wait three days first, since pnpm 11 rejects anything under a day old.
 
 ## Verification (no local runner for workflows)
 

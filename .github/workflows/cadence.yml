@@ -53,7 +53,8 @@ jobs:
             const CHECKLISTS = {
               weekly: [
                 'Review the **SEV3 digest** — anything recurring becomes a systemic fix (an issue).',
-                'Merge the **Renovate batch** (the grouped non-major PR), once its checks are green.',
+                'Handle the **Renovate PRs still open**. The non-major batch and the lock file refresh ' +
+                  'merge themselves when green, so what is left is majors and anything that went red.',
               ],
               monthly: [
                 '**`copier update` sweep** — pull template fixes into every active repo as diffs.',
