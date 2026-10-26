@@ -102,7 +102,7 @@ jobs:
         if: steps.packet.outputs.found == 'true' && inputs.runtime == 'node'
         with:
           package_json_file: ${{ inputs.working-directory }}/package.json
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         if: steps.packet.outputs.found == 'true' && inputs.runtime == 'node'
         with:
           node-version: ${{ inputs.node-version }}
@@ -152,7 +152,7 @@ jobs:
           # athena is a pnpm project whatever the consumer is written in, so a python repo
           # still needs node here even though its own tests never touch it.
           package_json_file: .athena-src/package.json
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         if: steps.packet.outputs.found == 'true' && inputs.runtime != 'node'
         with:
           node-version: ${{ inputs.node-version }}
