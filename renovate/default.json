@@ -24,6 +24,11 @@
       "allowedVersions": "<12"
     },
     {
+      "description": "Hold TypeScript below 7. Stryker's core still calls ts.parseConfigFileTextToJson, which the TypeScript 7 native compiler no longer exports: on 2026-10-26 mutation testing crashed under TypeScript 7.0.2 with Stryker 10.0.0 and with 10.1.1. athena and the cf-worker-app template gate on mutation score. Lift once a Stryker release runs under TypeScript 7.",
+      "matchPackageNames": ["typescript"],
+      "allowedVersions": "<7"
+    },
+    {
       "description": "Surface platform reusable-workflow major bumps on their own PR (D-18 migration = one line).",
       "matchManagers": ["github-actions"],
       "matchDepNames": ["willzhu16/platform"],
