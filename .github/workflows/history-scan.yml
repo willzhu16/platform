@@ -21,11 +21,11 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout full history
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
       - name: Fetch shared gitleaks config from platform
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # Hardcoded on purpose: this file is COPIED into a legacy repo and dispatched
           # there, so every context-derived location (github.workflow_ref, job.workflow_*)

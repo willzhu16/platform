@@ -52,7 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Resolve platform repo ref
         id: platform
         # A reusable workflow's `github.*` context is the CALLER's, so read the `job`
@@ -63,7 +63,7 @@ jobs:
           echo "repository=${{ job.workflow_repository }}" >> "$GITHUB_OUTPUT"
           echo "ref=${{ job.workflow_sha }}" >> "$GITHUB_OUTPUT"
       - name: Fetch the shared retention policy from platform
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: ${{ steps.platform.outputs.repository }}
           ref: ${{ steps.platform.outputs.ref }}
