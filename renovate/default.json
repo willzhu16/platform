@@ -8,11 +8,25 @@
     "enabled": true,
     "schedule": ["before 06:00 on monday"]
   },
+  "copier": {
+    "description": "Template updates are the monthly manual copier sweep (handbook/cadences.md), not Renovate PRs. Generated repos record their source as gh:willzhu16/platform, which Renovate cannot look up, so leaving this on only adds a lookup warning to every dashboard.",
+    "enabled": false
+  },
   "packageRules": [
     {
       "description": "Batch minor/patch/pin/digest updates into one weekly PR (D-11 grouping value).",
       "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
       "groupName": "non-major dependencies"
+    },
+    {
+      "description": "Hold pnpm below 12. pnpm 12 writes a new lockfile format that osv-scanner reads only a sliver of: on 2026-10-26 the pnpm 12 PRs scanned 15 packages where the current lockfile has 294 (athena) and 186 (canary-worker), so security / osv passed without checking dependencies. Lift once osv-scanner reads the new format.",
+      "matchPackageNames": ["pnpm"],
+      "allowedVersions": "<12"
+    },
+    {
+      "description": "Hold TypeScript below 7. Stryker's core still calls ts.parseConfigFileTextToJson, which the TypeScript 7 native compiler no longer exports: on 2026-10-26 mutation testing crashed under TypeScript 7.0.2 with Stryker 10.0.0 and with 10.1.1. athena and the cf-worker-app template gate on mutation score. Lift once a Stryker release runs under TypeScript 7.",
+      "matchPackageNames": ["typescript"],
+      "allowedVersions": "<7"
     },
     {
       "description": "Surface platform reusable-workflow major bumps on their own PR (D-18 migration = one line).",
