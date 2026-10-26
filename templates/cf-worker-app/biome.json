@@ -6,7 +6,16 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!node_modules", "!coverage", "!dist", "!worker-configuration.d.ts"]
+    "includes": [
+      "**",
+      "!node_modules",
+      "!coverage",
+      "!dist",
+      "!worker-configuration.d.ts",
+      "!**/*.md",
+      "!**/*.yml",
+      "!**/*.yaml"
+    ]
   },
   "formatter": {
     "enabled": true,
