@@ -83,7 +83,7 @@ echo "Preflight: ${REPO_DIR}"
 # 1. Already adopted?
 if [ -f "${REPO_DIR}/.athena/config.json" ]; then
   note '.athena/config.json exists — this repo is already athena-managed'
-  if printf '%s' ",${PIECES}," | grep -q ',instructions,' && [ -z "$FORCE" ]; then
+  if grep -q ',instructions,' <<<",${PIECES}," && [ -z "$FORCE" ]; then
     block '.athena/config.json already exists and --with instructions would overwrite it'
     say '' 'pass --force to replace it, after checking its stack, tools and permission tier.'
   fi
@@ -127,7 +127,7 @@ fi
 # an existing ci.yml is none of our business unless --with ci is asked for.
 for piece in security ci codeql; do
   if [ -f "${REPO_DIR}/.github/workflows/${piece}.yml" ]; then
-    if printf '%s' ",${PIECES}," | grep -q ",${piece}," && [ -z "$FORCE" ]; then
+    if grep -q ",${piece}," <<<",${PIECES}," && [ -z "$FORCE" ]; then
       block "${piece}.yml already exists and --with ${piece} would overwrite it"
       say '' 'pass --force to replace it, after checking what the existing one does.'
     else

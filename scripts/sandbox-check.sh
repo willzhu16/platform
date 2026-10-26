@@ -49,7 +49,7 @@ read_list() { # $1=dotted path
 }
 
 has() { # $1=needle $2=list
-  printf '%s\n' "$2" | grep -qxF "$1"
+  grep -qxF "$1" <<<"$2"
 }
 
 node -e 'JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8"))' "$PROFILE" 2>/dev/null \

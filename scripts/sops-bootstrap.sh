@@ -108,7 +108,7 @@ if command -v sops >/dev/null 2>&1; then
   probe="$REPO_DIR/secrets/.sops-bootstrap-probe.env"
   mkdir -p "$REPO_DIR/secrets"
   printf 'PROBE=not-a-secret\n' >"$probe"
-  if sops --config "$SOPS_FILE" -e "$probe" 2>/dev/null | grep -qF 'ENC[AES256_GCM'; then
+  if grep -qF 'ENC[AES256_GCM' < <(sops --config "$SOPS_FILE" -e "$probe" 2>/dev/null); then
     printf '\nverified: sops encrypts secrets/*.env to this recipient\n'
     rm -f "$probe"
   else

@@ -439,7 +439,7 @@ sandbox_verdict() { # $1=profile json -> ok | first FAIL line
   if out="$(bash "$SANDBOX_CHECK" "$file" 2>&1)"; then
     echo ok
   else
-    printf '%s\n' "$out" | grep -m 1 '^FAIL' | sed 's/^FAIL  //'
+    grep -m 1 '^FAIL' <<<"$out" | sed 's/^FAIL  //'
   fi
 }
 
@@ -620,7 +620,7 @@ check 'no private key file is created when a recipient is supplied' \
   "$(root="$(sops_fixture nokey 'secrets/README.md:# r')" &&
      cp "$PLATFORM_ROOT/templates/cf-worker-app/.sops.yaml" "$root/.sops.yaml" &&
      bash "$SOPS_BOOTSTRAP" "$root" --recipient "$SOPS_VALID_RECIPIENT" >/dev/null 2>&1 &&
-     { find "$root" -name '*.agekey' | grep -q . && echo found || echo none; })"
+     { grep -q . < <(find "$root" -name '*.agekey') && echo found || echo none; })"
 # --- fleet audit ------------------------------------------------------------------------
 #
 # fleet_findings carries most of these: it is the whole decision, and it takes the inventory
