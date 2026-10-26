@@ -19,6 +19,11 @@
       "groupName": "non-major dependencies"
     },
     {
+      "description": "Hold pnpm below 12. pnpm 12 writes a new lockfile format that osv-scanner reads only a sliver of: on 2026-10-26 the pnpm 12 PRs scanned 15 packages where the current lockfile has 294 (athena) and 186 (canary-worker), so security / osv passed without checking dependencies. Lift once osv-scanner reads the new format.",
+      "matchPackageNames": ["pnpm"],
+      "allowedVersions": "<12"
+    },
+    {
       "description": "Surface platform reusable-workflow major bumps on their own PR (D-18 migration = one line).",
       "matchManagers": ["github-actions"],
       "matchDepNames": ["willzhu16/platform"],
