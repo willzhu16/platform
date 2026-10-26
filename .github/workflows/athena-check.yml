@@ -50,7 +50,7 @@ jobs:
           # Resolve the pnpm version from athena's packageManager field — the caller repo
           # may not even be a Node project (py-tool).
           package_json_file: .athena-src/package.json
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: ${{ inputs.node-version }}
           cache: pnpm
