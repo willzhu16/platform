@@ -8,6 +8,10 @@
     "enabled": true,
     "schedule": ["before 06:00 on monday"]
   },
+  "copier": {
+    "description": "Template updates are the monthly manual copier sweep (handbook/cadences.md), not Renovate PRs. Generated repos record their source as gh:willzhu16/platform, which Renovate cannot look up, so leaving this on only adds a lookup warning to every dashboard.",
+    "enabled": false
+  },
   "packageRules": [
     {
       "description": "Batch minor/patch/pin/digest updates into one weekly PR (D-11 grouping value).",
