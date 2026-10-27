@@ -33,6 +33,12 @@
       "minimumReleaseAge": "3 days"
     },
     {
+      "description": "Give GitHub Actions the same three-day wait, along with the Node and Python versions setup-node and setup-python install. Renovate dates a tag by its GitHub release when that is later than the tag's own date, and a lookup on 2026-10-27 found a date for every pinned Action. A new release therefore waits the full three days, but a tag moved onto a backdated commit can look old, so this stops broken releases more surely than deliberate ones. The two images selftest.yml pins by digest alone stay out: Renovate has no date for them, and it never treats an undated update as old enough, so they would stop updating.",
+      "matchManagers": ["github-actions"],
+      "matchDatasources": ["github-tags", "github-releases"],
+      "minimumReleaseAge": "3 days"
+    },
+    {
       "description": "Hold pnpm below 12. pnpm 12 writes a new lockfile format that osv-scanner reads only a sliver of: on 2026-10-26 the pnpm 12 PRs scanned 15 packages where the current lockfile has 294 (athena) and 186 (canary-worker), so security / osv passed without checking dependencies. Lift once osv-scanner reads the new format.",
       "matchPackageNames": ["pnpm"],
       "allowedVersions": "<12"
