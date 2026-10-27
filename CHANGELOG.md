@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.13.1](https://github.com/willzhu16/platform/compare/v1.13.0...v1.13.1) (2026-10-27)
+
+
+### Bug Fixes
+
+* **scripts:** stop an early grep exit failing a pipefail check ([#88](https://github.com/willzhu16/platform/issues/88)) ([8b67889](https://github.com/willzhu16/platform/commit/8b67889773add3773265ac266071f4408835acce))
+* **templates:** keep Biome 2.6 off YAML and Markdown ([#86](https://github.com/willzhu16/platform/issues/86)) ([7181225](https://github.com/willzhu16/platform/commit/71812250635b73f390f3b60c13a51b0a4c9caa35))
+
 ## [1.13.0](https://github.com/willzhu16/platform/compare/v1.12.0...v1.13.0) (2026-10-19)
 
 
