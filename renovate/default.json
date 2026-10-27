@@ -4,9 +4,13 @@
   "schedule": ["before 06:00 on monday"],
   "prConcurrentLimit": 5,
   "labels": ["dependencies"],
+  "description": "Automerged PRs are merged by Renovate itself (platformAutomerge off) because GitHub's own auto-merge setting is off in these repos, and with squash because the rulesets allow only squash or merge and also require linear history.",
+  "platformAutomerge": false,
+  "automergeStrategy": "squash",
   "lockFileMaintenance": {
     "enabled": true,
-    "schedule": ["before 06:00 on monday"]
+    "schedule": ["before 06:00 on monday"],
+    "automerge": true
   },
   "copier": {
     "description": "Template updates are the monthly manual copier sweep (handbook/cadences.md), not Renovate PRs. Generated repos record their source as gh:willzhu16/platform, which Renovate cannot look up, so leaving this on only adds a lookup warning to every dashboard.",
@@ -17,6 +21,16 @@
       "description": "Batch minor/patch/pin/digest updates into one weekly PR (D-11 grouping value).",
       "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
       "groupName": "non-major dependencies"
+    },
+    {
+      "description": "The non-major batch merges itself once every required check is green, like the lock file refresh. Majors still wait for a person. The checks are the review here; a red batch stays open for the weekly cadence.",
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "automerge": true
+    },
+    {
+      "description": "Wait three days before proposing an npm or PyPI release. pnpm 11 already rejects any version under a day old (its minimumReleaseAge default), so a younger one only fails CI; the other two days give a malicious release time to be caught and pulled before automerge would ship it. Security fixes skip the wait: vulnerabilityAlerts sets minimumReleaseAge to null.",
+      "matchDatasources": ["npm", "pypi"],
+      "minimumReleaseAge": "3 days"
     },
     {
       "description": "Hold pnpm below 12. pnpm 12 writes a new lockfile format that osv-scanner reads only a sliver of: on 2026-10-26 the pnpm 12 PRs scanned 15 packages where the current lockfile has 294 (athena) and 186 (canary-worker), so security / osv passed without checking dependencies. Lift once osv-scanner reads the new format.",
