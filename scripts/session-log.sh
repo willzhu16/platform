@@ -54,7 +54,7 @@ SESSION_LOG_PATTERNS=(
 # ("Tool/model"), which sed reads as its own substitution delimiter.
 session_log_field() { # $1=field $2=block
   local line
-  line="$(printf '%s\n' "$2" | grep -m 1 -E "^[[:space:]]*$1:")"
+  line="$(grep -m 1 -E "^[[:space:]]*$1:" <<<"$2")"
   line="${line#*:}"
   line="${line#"${line%%[![:space:]]*}"}"
   line="${line%"${line##*[![:space:]]}"}"
@@ -69,7 +69,7 @@ session_log_field_count() { # $1=field $2=block
 validate_session_log() { # $1=text containing the block
   local text="$1" problems=0 index field pattern value count
 
-  if ! printf '%s\n' "$text" | grep -q -E '^[[:space:]]*## Session log[[:space:]]*$'; then
+  if ! grep -q -E '^[[:space:]]*## Session log[[:space:]]*$' <<<"$text"; then
     echo 'no "## Session log" heading — every agent PR body ends with one'
     return 1
   fi
@@ -102,12 +102,12 @@ validate_session_log() { # $1=text containing the block
       continue
     fi
     # A placeholder left unfilled reads as a completed field to every reader but a person.
-    if printf '%s' "$value" | grep -q -E '^<.*>$|^…$|^\.\.\.$'; then
+    if grep -q -E '^<.*>$|^…$|^\.\.\.$' <<<"$value"; then
       printf 'placeholder left unfilled: %s\n' "$field"
       problems=$((problems + 1))
       continue
     fi
-    if [ -n "$pattern" ] && ! printf '%s' "$value" | grep -q -E "$pattern"; then
+    if [ -n "$pattern" ] && ! grep -q -E "$pattern" <<<"$value"; then
       printf 'field %s does not match %s: %s\n' "$field" "$pattern" "$value"
       problems=$((problems + 1))
     fi

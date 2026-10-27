@@ -152,7 +152,7 @@ fi
 
 # ---- 6. Apply the main ruleset ---------------------------------------------
 step '6. Apply main ruleset'
-if gh api "repos/${OWNER}/${NAME}/rulesets" --jq '.[].name' 2>/dev/null | grep -qx main; then
+if grep -qx main <<<"$(gh api "repos/${OWNER}/${NAME}/rulesets" --jq '.[].name' 2>/dev/null)"; then
   ok 'ruleset "main" already present — skipping'
 else
   RULESET="$(cat "${PLATFORM_ROOT}/rulesets/main.json")"
