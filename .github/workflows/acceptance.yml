@@ -114,7 +114,7 @@ jobs:
         run: |
           pnpm install --frozen-lockfile
           pnpm test
-      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         if: steps.packet.outputs.found == 'true' && inputs.runtime == 'python'
       - name: Install and test (python)
         # --json-report rather than the project's own pytest invocation: the criterion claim
