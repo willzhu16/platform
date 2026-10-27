@@ -8,7 +8,8 @@ The workflow embeds a copy of these checklists (`CHECKLISTS`); edit both togethe
 ## Weekly (Mondays)
 
 - [ ] Review the **SEV3 digest** — anything recurring becomes a systemic fix (an issue).
-- [ ] Merge the **Renovate batch** (the grouped non-major PR), once its checks are green.
+- [ ] Handle the **Renovate PRs still open**. The non-major batch and the lock file refresh
+      merge themselves when green, so what is left is majors and anything that went red.
 
 ## Monthly (1st)
 
