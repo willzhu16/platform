@@ -988,5 +988,26 @@ print("same" if security and security == selftest else f"{sorted(security)} != {
 PY
 )"
 
+# Regression: the non-major batch moved security.yml's semgrep job to Python 3.15, where
+# semgrep-core crashes, and selftest's semgrep job, on the same Python, missed it because it
+# only ran --test. Its real scan now guards security.yml's, but only on identical setups.
+check 'selftest runs semgrep with the same version and Python as security.yml' \
+  'same' \
+  "$(python3 - "$PLATFORM_ROOT/.github/workflows" <<'PY' 2>/dev/null
+import pathlib, sys, yaml
+root = pathlib.Path(sys.argv[1])
+def setup(name, job_id):
+    doc = yaml.safe_load((root / name).read_text())
+    job = doc["jobs"][job_id]
+    version = {**doc.get("env", {}), **job.get("env", {})}.get("SEMGREP_VERSION")
+    pythons = [step["with"]["python-version"] for step in job["steps"]
+               if step.get("uses", "").startswith("actions/setup-python@")]
+    return version, pythons
+security = setup("security.yml", "semgrep")
+selftest = setup("selftest.yml", "test-semgrep-rules")
+print("same" if security[0] and security[1] and security == selftest else f"{security} != {selftest}")
+PY
+)"
+
 printf '\n%d passed, %d failed\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]

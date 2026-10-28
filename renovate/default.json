@@ -49,6 +49,12 @@
       "allowedVersions": "<7"
     },
     {
+      "description": "Hold the Python that setup-python installs below 3.14. semgrep-core 1.168.0 crashes under Python 3.15 (\"failed to create domain backup thread\"): on 2026-10-28 the scan failed in 6 of 6 runs on 3.15 and passed in 6 of 6 on 3.13, with and without -j 1, after the non-major batch moved security.yml to 3.15 and every security / semgrep check began failing. Lift once selftest's real semgrep scan passes on a newer Python.",
+      "matchManagers": ["github-actions"],
+      "matchDepNames": ["python"],
+      "allowedVersions": "<3.14"
+    },
+    {
       "description": "Surface platform reusable-workflow major bumps on their own PR (D-18 migration = one line).",
       "matchManagers": ["github-actions"],
       "matchDepNames": ["willzhu16/platform"],
