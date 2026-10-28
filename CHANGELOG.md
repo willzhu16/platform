@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.14.0](https://github.com/willzhu16/platform/compare/v1.13.1...v1.14.0) (2026-10-28)
+
+
+### Features
+
+* **security:** fail osv when packages go unscanned ([#92](https://github.com/willzhu16/platform/issues/92)) ([7124cd3](https://github.com/willzhu16/platform/commit/7124cd3ae2d72f29e32835218d90636c16b0343c))
+
+
+### Bug Fixes
+
+* **templates:** hold pytest below 9.2 in py-tool for mutmut ([#93](https://github.com/willzhu16/platform/issues/93)) ([39708e6](https://github.com/willzhu16/platform/commit/39708e60d8c7ee0e7c85e4ee95bb710f4842aaec))
+
 ## [1.13.1](https://github.com/willzhu16/platform/compare/v1.13.0...v1.13.1) (2026-10-27)
 
 
