@@ -53,7 +53,7 @@ jobs:
             --severity=warning scripts/new-project.sh scripts/setup-machine.sh
             scripts/adopt-project.sh scripts/lib.sh scripts/tests.sh scripts/session-log.sh
             scripts/sandbox-check.sh scripts/fleet-audit.sh scripts/sops-check.sh
-            scripts/sops-bootstrap.sh
+            scripts/sops-bootstrap.sh scripts/osv-coverage.sh
 
   # scripts/tests.sh regression-tests the pure logic extracted into scripts/lib.sh — the
   # entry scripts themselves can never run in CI (they create real GitHub repos / mutate
@@ -190,6 +190,30 @@ jobs:
               sys.exit(1)
           print('custom rules match the fixture:', dict(found))
           PY
+
+  # security.yml's osv coverage steps run only in consumer repos, and only after a release
+  # moves v1, so a step that misread the scanner's output would fail every PR in the fleet at
+  # once. These are the same two steps against the fixtures' lockfiles, with the same scanner
+  # pin; tests.sh asserts the pin and arguments match. A scanner bump that changes the JSON
+  # or the flags fails here, on the platform PR that carries it.
+  test-osv-coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: List every package osv-scanner reads
+        # Exits 1 on any advisory; only the package list matters here.
+        continue-on-error: true
+        uses: google/osv-scanner-action/osv-scanner-action@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
+        with:
+          scan-args: |-
+            --format=json
+            --all-packages
+            --output-file=.artemis-osv-packages.json
+            --recursive
+            ./
+      - name: Verify osv-scanner read every lockfile
+        run: bash scripts/osv-coverage.sh .artemis-osv-packages.json
 
   ci:
     uses: ./.github/workflows/ci.yml
@@ -443,6 +467,7 @@ jobs:
       - lint-configs
       - test-semgrep-rules
       - test-gitleaks-rules
+      - test-osv-coverage
       - ci
       - ci-python
       - render-cf-worker-app

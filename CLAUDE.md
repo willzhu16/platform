@@ -51,9 +51,12 @@ service to run; the deploy target is GitHub itself.
   ruleset requires and could fail while the PR stayed mergeable), `sops-bootstrap.sh`
   (writes a real age recipient into a project's `.sops.yaml`; generates a per-project key by
   default, `--recipient` reuses a shared one, and the private half is never printed or
-  committed). Their pure string-building logic lives in `lib.sh`, regression-tested by
-  `tests.sh` (`bash scripts/tests.sh`; needs jq + python3/PyYAML — safe to run, touches
-  nothing). Shellcheck + the tests are gated by selftest.
+  committed), `osv-coverage.sh` (fails `security / osv` when osv-scanner skipped a committed
+  `pnpm-lock.yaml`/`uv.lock` or read under 90% of its packages, as 2.3.8 did with pnpm 12;
+  also a STEP, fed by a second scanner run with `--all-packages`, and mirrored by selftest's
+  `test-osv-coverage` job with the same pin). Their pure string-building logic lives in
+  `lib.sh`, regression-tested by `tests.sh` (`bash scripts/tests.sh`; needs jq +
+  python3/PyYAML — safe to run, touches nothing). Shellcheck + the tests are gated by selftest.
 - `fleet/unmanaged.json` — the repos deliberately outside the harness, each with a reason,
   plus the `epoch` that bounds the question (a repo created before Artemis existed was never
   a candidate). `scripts/fleet-audit.sh` reports any repo in scope that is neither
