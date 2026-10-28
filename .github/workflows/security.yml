@@ -23,7 +23,7 @@ on:
         default: '' # optional extra rules appended to the shared set
       osv-lockfiles:
         type: string
-        default: 'auto' # explicit lockfile paths if auto-detection misfires
+        default: 'auto' # explicit lockfile paths if auto-detection misfires; skips coverage
 
 permissions:
   contents: read
@@ -174,6 +174,57 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Resolve platform repo ref
+        id: platform
+        # A reusable workflow's `github.*` context is the CALLER's, so read the `job`
+        # context: `job.workflow_repository`/`job.workflow_sha` identify the repo + commit
+        # of the workflow file defining THIS job: platform at the consumer's pinned ref.
+        run: |
+          echo "repository=${{ job.workflow_repository }}" >> "$GITHUB_OUTPUT"
+          echo "ref=${{ job.workflow_sha }}" >> "$GITHUB_OUTPUT"
+      - name: Fetch the coverage check from platform
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ steps.platform.outputs.repository }}
+          ref: ${{ steps.platform.outputs.ref }}
+          sparse-checkout: scripts/osv-coverage.sh
+          sparse-checkout-cone-mode: false
+          path: .artemis-platform
+      # A scan that cannot read a lockfile reports no advisories in it, which passes. These two
+      # steps make it prove what it read: list every package it sees, then compare that with a
+      # count of each lockfile (scripts/osv-coverage.sh). Steps, not a job, for the reason the
+      # secrets gate gives above: `security / osv` is already required everywhere.
+      #
+      # selftest.yml runs the same two steps against the fixtures with the same scanner pin, so
+      # a scanner bump that changes this output fails in platform before v1 carries it out.
+      - name: List every package osv-scanner reads
+        if: inputs.osv-lockfiles == 'auto'
+        # It exits 1 whenever it finds an advisory. The scan below is the step that reports
+        # those; this one only has to leave its package list behind.
+        continue-on-error: true
+        uses: google/osv-scanner-action/osv-scanner-action@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
+        with:
+          scan-args: |-
+            --format=json
+            --all-packages
+            --output-file=.artemis-osv-packages.json
+            --recursive
+            ./
+      - name: Verify osv-scanner read every lockfile
+        id: coverage
+        if: inputs.osv-lockfiles == 'auto'
+        run: bash .artemis-platform/scripts/osv-coverage.sh .artemis-osv-packages.json
+      - name: Unread lockfile (on finding)
+        if: failure() && steps.coverage.conclusion == 'failure'
+        run: |
+          {
+            echo '### 🔍 osv-scanner did not read every lockfile'
+            echo ''
+            echo 'Advisories in the packages it skipped were never checked, so a pass would be'
+            echo 'meaningless. The usual cause is a lockfile format the pinned scanner cannot'
+            echo 'fully parse yet: hold the package-manager update that introduced it in'
+            echo 'renovate/default.json until a scanner release reads it.'
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: OSV scan (lockfiles)
         # 'auto' scans the repo recursively (osv-scanner finds every supported lockfile);
         # pass explicit paths via the osv-lockfiles input when auto-detection misfires.

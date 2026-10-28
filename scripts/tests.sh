@@ -773,5 +773,220 @@ check 'a token that sees private repos runs the audit' \
   'unmanaged gizmo — created 2026-08-01, no .athena/config.json and no entry in fleet/unmanaged.json' \
   "$(fleet_audit_with_gh 'memoria')"
 
+# --- osv coverage gate ------------------------------------------------------------------
+#
+# The scanner's output is faked as JSON in the shape `--all-packages` prints, so these need no
+# scanner and no network. selftest's test-osv-coverage job runs the real one on the fixtures.
+
+# shellcheck source=scripts/osv-coverage.sh
+. "$SCRIPT_DIR/osv-coverage.sh"
+
+# A repo holding the given files, staged. Staging is enough: the gate reads `git ls-files`.
+osv_fixture() { # $1=name, $2...=relative-path:content
+  local name="$1"; shift
+  local root="$TMP/osv-$name"
+  rm -rf "$root"
+  mkdir -p "$root"
+  git -C "$root" init -q
+  local pair path
+  for pair in "$@"; do
+    path="$root/${pair%%:*}"
+    mkdir -p "$(dirname "$path")"
+    printf '%s\n' "${pair#*:}" >"$path"
+  done
+  git -C "$root" add -A
+  printf '%s\n' "$root"
+}
+
+# What osv-scanner would print having read each lockfile under /scan, its count after the colon.
+osv_json() { # $1...=repo-relative-path:package-count
+  local pair
+  for pair in "$@"; do
+    jq -n --arg path "/scan/${pair%%:*}" --argjson n "${pair#*:}" \
+      '{source: {path: $path, type: "lockfile"},
+        packages: [range($n) | {package: {name: "pkg\(.)", version: "1.0.0"}}]}'
+  done | jq -s '{results: .}'
+}
+
+osv_verdict() { # $1=repo dir; the scanner's JSON on stdin
+  cat >"$TMP/osv.json"
+  osv_coverage_findings "$TMP/osv.json" "$1" /scan
+}
+
+# Three packages: vite appears twice with different peers, and neither the packages: section
+# nor the keys nested under a snapshot are packages of their own.
+OSV_PNPM="lockfileVersion: '9.0'
+
+importers:
+
+  .:
+    devDependencies:
+      vite:
+        specifier: ^8.1.4
+        version: 8.1.4(@types/node@24.0.0)
+
+packages:
+
+  '@types/node@24.0.0':
+    resolution: {integrity: sha512-a}
+
+  esbuild@0.25.0:
+    resolution: {integrity: sha512-b}
+
+  vite@8.1.4:
+    resolution: {integrity: sha512-c}
+
+snapshots:
+
+  '@types/node@24.0.0': {}
+
+  esbuild@0.25.0:
+    optionalDependencies:
+      '@esbuild/linux-x64': 0.25.0
+
+  vite@8.1.4(@types/node@24.0.0):
+    dependencies:
+      esbuild: 0.25.0
+
+  vite@8.1.4(@types/node@25.0.0):
+    dependencies:
+      esbuild: 0.25.0"
+
+# pnpm 12's shape: a small document for pnpm's own config dependencies, then the lockfile.
+# Four packages in all, one of them in both documents.
+OSV_PNPM12="---
+lockfileVersion: '9.0'
+
+snapshots:
+
+  pnpm@12.0.0: {}
+
+  '@pnpm/config@1.0.0': {}
+
+---
+lockfileVersion: '9.0'
+
+snapshots:
+
+  esbuild@0.25.0: {}
+
+  vite@8.1.4(@types/node@24.0.0): {}
+
+  '@pnpm/config@1.0.0': {}"
+
+OSV_UV='version = 1
+requires-python = ">=3.12"
+
+[[package]]
+name = "colorama"
+version = "0.4.6"
+
+[[package]]
+name = "demo"
+version = "0.1.0"
+source = { editable = "." }
+
+[[package]]
+name = "pytest"
+version = "8.4.0"'
+
+OSV_UV_TEN="$(for i in 1 2 3 4 5 6 7 8 9 10; do printf '[[package]]\nname = "p%s"\n\n' "$i"; done)"
+
+echo '== osv coverage gate (scripts/osv-coverage.sh)'
+
+check 'a pnpm lockfile counts distinct snapshots, not peer variants or nested keys' \
+  '3' \
+  "$(osv_lockfile_count "$(osv_fixture pnpm "pnpm-lock.yaml:$OSV_PNPM")/pnpm-lock.yaml")"
+
+check 'a pnpm 12 lockfile counts both YAML documents, each package once' \
+  '4' \
+  "$(osv_lockfile_count "$(osv_fixture pnpm12 "pnpm-lock.yaml:$OSV_PNPM12")/pnpm-lock.yaml")"
+
+check 'a uv.lock counts every [[package]] block, the project itself included' \
+  '3' \
+  "$(osv_lockfile_count "$(osv_fixture uv "uv.lock:$OSV_UV")/uv.lock")"
+
+check 'a scanner that read every package of every lockfile is silent' \
+  '' \
+  "$(osv_json pnpm-lock.yaml:3 py/uv.lock:3 |
+     osv_verdict "$(osv_fixture full "pnpm-lock.yaml:$OSV_PNPM" "py/uv.lock:$OSV_UV")")"
+
+# Regression: on 2026-10-26 osv-scanner 2.3.8 read only the first YAML document of the pnpm 12
+# lockfiles, 15 of athena's 309 packages, and `security / osv` passed the Renovate PRs.
+check 'a scanner that read only the first document of a pnpm 12 lockfile fails the gate' \
+  'partial pnpm-lock.yaml: osv-scanner read 2 of 4 packages; the rest were never checked' \
+  "$(osv_json pnpm-lock.yaml:2 | osv_verdict "$(osv_fixture first-doc "pnpm-lock.yaml:$OSV_PNPM12")")"
+
+check 'a committed lockfile the scanner never listed is reported' \
+  'unscanned py/uv.lock: osv-scanner did not list it, so none of its 3 packages were checked' \
+  "$(osv_json pnpm-lock.yaml:3 |
+     osv_verdict "$(osv_fixture skipped "pnpm-lock.yaml:$OSV_PNPM" "py/uv.lock:$OSV_UV")")"
+
+# Matching on a path suffix would let app/pnpm-lock.yaml stand in for the root one.
+check 'a lockfile is matched by its full path, not by a file name it shares' \
+  'unscanned pnpm-lock.yaml: osv-scanner did not list it, so none of its 3 packages were checked' \
+  "$(osv_json app/pnpm-lock.yaml:3 |
+     osv_verdict "$(osv_fixture same-name "pnpm-lock.yaml:$OSV_PNPM" "app/pnpm-lock.yaml:$OSV_PNPM")")"
+
+check 'an untracked lockfile is not required, since the scanner skips ignored paths' \
+  '' \
+  "$(root="$(osv_fixture untracked "pnpm-lock.yaml:$OSV_PNPM")" &&
+     printf '%s\n' "$OSV_UV" >"$root/uv.lock" &&
+     osv_json pnpm-lock.yaml:3 | osv_verdict "$root")"
+
+check 'reading exactly 90% of a lockfile passes' \
+  '' \
+  "$(osv_json uv.lock:9 | osv_verdict "$(osv_fixture ninety "uv.lock:$OSV_UV_TEN")")"
+
+check 'reading less than 90% of a lockfile fails' \
+  'partial uv.lock: osv-scanner read 8 of 10 packages; the rest were never checked' \
+  "$(osv_json uv.lock:8 | osv_verdict "$(osv_fixture eighty "uv.lock:$OSV_UV_TEN")")"
+
+# A format this check cannot read must not pass as an empty lockfile while the scanner reads it.
+check 'a lockfile the scanner reads but this check counts as empty is reported' \
+  'uncounted pnpm-lock.yaml: osv-scanner read 5 packages and this check counted none' \
+  "$(osv_json pnpm-lock.yaml:5 |
+     osv_verdict "$(osv_fixture new-format "pnpm-lock.yaml:lockfileVersion: '99.0'")")"
+
+check 'a lockfile with no packages has nothing to miss' \
+  '' \
+  "$(osv_json | osv_verdict "$(osv_fixture empty-lock "pnpm-lock.yaml:lockfileVersion: '9.0'")")"
+
+# The PASS line carries the counts, so a pass over nothing cannot read like a pass over a fleet.
+check 'the PASS line says how many packages and lockfiles were compared' \
+  'PASS  osv-scanner read 6 of 6 packages across 2 lockfile(s)' \
+  "$(root="$(osv_fixture pass-line "pnpm-lock.yaml:$OSV_PNPM" "py/uv.lock:$OSV_UV")" &&
+     osv_json pnpm-lock.yaml:3 py/uv.lock:3 >"$TMP/osv-pass.json" &&
+     bash "$SCRIPT_DIR/osv-coverage.sh" "$TMP/osv-pass.json" "$root" /scan)"
+
+check 'a missing package list fails instead of passing unchecked' \
+  'rejected' \
+  "$(bash "$SCRIPT_DIR/osv-coverage.sh" "$TMP/no-such.json" \
+    "$(osv_fixture no-json "uv.lock:$OSV_UV")" /scan >/dev/null 2>&1 && echo accepted || echo rejected)"
+
+check 'the gate exits non-zero on a finding, since the exit code is the gate' \
+  'rejected' \
+  "$(root="$(osv_fixture exit "uv.lock:$OSV_UV_TEN")" &&
+     osv_json uv.lock:1 >"$TMP/osv-exit.json" &&
+     bash "$SCRIPT_DIR/osv-coverage.sh" "$TMP/osv-exit.json" "$root" /scan >/dev/null 2>&1 &&
+     echo accepted || echo rejected)"
+
+# selftest's copy of the scan is only a guard for security.yml's while the two are identical.
+check 'selftest runs the coverage scan with the same scanner pin and arguments as security.yml' \
+  'same' \
+  "$(python3 - "$PLATFORM_ROOT/.github/workflows" <<'PY' 2>/dev/null
+import pathlib, sys, yaml
+root = pathlib.Path(sys.argv[1])
+def scans(name):
+    jobs = yaml.safe_load((root / name).read_text())["jobs"]
+    return {(step["uses"], step["with"]["scan-args"])
+            for job in jobs.values() for step in job.get("steps", [])
+            if step.get("uses", "").startswith("google/osv-scanner-action/")
+            and "--all-packages" in step.get("with", {}).get("scan-args", "")}
+security, selftest = scans("security.yml"), scans("selftest.yml")
+print("same" if security and security == selftest else f"{sorted(security)} != {sorted(selftest)}")
+PY
+)"
+
 printf '\n%d passed, %d failed\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]
