@@ -88,6 +88,7 @@ service to run; the deploy target is GitHub itself.
 - `renovate/default.json` — shared preset; isolates platform major bumps into their own PR.
   The lock file refresh and the non-major batch automerge when green (majors never do), and
   npm/PyPI releases wait three days first, since pnpm 11 rejects anything under a day old.
+  Actions wait three days too; the two digest-only images in selftest.yml cannot (no date).
 
 ## Verification (no local runner for workflows)
 
