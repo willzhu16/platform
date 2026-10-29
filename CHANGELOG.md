@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.15.0](https://github.com/willzhu16/platform/compare/v1.14.1...v1.15.0) (2026-10-29)
+
+
+### Features
+
+* **release:** move v1 only after canary-worker has run the release ([#99](https://github.com/willzhu16/platform/issues/99)) ([6401b94](https://github.com/willzhu16/platform/commit/6401b945c2f54d00c9d562496915f782a4fd5331))
+* **templates:** sync template files into existing repos weekly ([#98](https://github.com/willzhu16/platform/issues/98)) ([d422bd5](https://github.com/willzhu16/platform/commit/d422bd5531546311951e1d0dab0848121e858310))
+
 ## [1.14.1](https://github.com/willzhu16/platform/compare/v1.14.0...v1.14.1) (2026-10-29)
 
 
