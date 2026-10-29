@@ -39,11 +39,6 @@
       "minimumReleaseAge": "3 days"
     },
     {
-      "description": "Hold pnpm below 12. pnpm 12 writes a new lockfile format that osv-scanner reads only a sliver of: on 2026-10-26 the pnpm 12 PRs scanned 15 packages where the current lockfile has 294 (athena) and 186 (canary-worker), so security / osv passed without checking dependencies. Lift once osv-scanner reads the new format.",
-      "matchPackageNames": ["pnpm"],
-      "allowedVersions": "<12"
-    },
-    {
       "description": "Hold TypeScript below 7. Stryker's core still calls ts.parseConfigFileTextToJson, which the TypeScript 7 native compiler no longer exports: on 2026-10-26 mutation testing crashed under TypeScript 7.0.2 with Stryker 10.0.0 and with 10.1.1. athena and the cf-worker-app template gate on mutation score. Lift once a Stryker release runs under TypeScript 7.",
       "matchPackageNames": ["typescript"],
       "allowedVersions": "<7"
