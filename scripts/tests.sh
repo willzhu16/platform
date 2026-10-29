@@ -1121,5 +1121,137 @@ check 'an update that leaves package.json alone leaves the lockfile alone' \
      PATH="$TMP/fake-pnpm:$PATH" template_sync_refresh_lockfiles "$root" 2>/dev/null &&
      { [ -e "$root/.pnpm-ran" ] && echo refreshed || echo untouched; })"
 
+# --- canary-gated release ---------------------------------------------------------------
+#
+# The verdict reads a canary run's job list, so these feed it job lists. The promotion itself
+# runs against a stand-in for gh, as the fleet audit does, with the clock passed in.
+
+# shellcheck source=scripts/canary-promote.sh
+. "$SCRIPT_DIR/canary-promote.sh"
+
+canary_jobs() { # $1=name, $2...="job name:conclusion" -> path of a jobs JSON file
+  local file="$TMP/canary-$1.json" pair
+  for pair in "${@:2}"; do
+    jq -n --arg name "${pair%:*}" --arg conclusion "${pair##*:}" '{name: $name, conclusion: $conclusion}'
+  done | jq -s . >"$file"
+  printf '%s\n' "$file"
+}
+
+CANARY_CLEAN="$(canary_jobs clean 'pending:success' \
+  'stable-ci / lint:success' 'canary-ci / lint:success' \
+  'stable-security / semgrep:success' 'canary-security / semgrep:success')"
+CANARY_REGRESSED="$(canary_jobs regressed 'pending:success' \
+  'stable-ci / lint:success' 'canary-ci / lint:success' \
+  'stable-security / semgrep:success' 'canary-security / semgrep:failure')"
+
+echo '== canary-gated release (scripts/canary-promote.sh)'
+
+check 'a canary run where every job matches v1 clears the release' \
+  'PASS  2 canary job(s) match v1 (0 fail on both and are not held against the release)' \
+  "$(canary_verdict "$CANARY_CLEAN")"
+
+# Regression: 1.13.1 reached every repo at once and broke `security / semgrep` there. This is
+# that release seen through the canary, which now holds it back.
+check 'a job that passes on v1 and fails on canary holds the release back' \
+  'regressed canary-security / semgrep: failure on canary, success on v1' \
+  "$(canary_verdict "$CANARY_REGRESSED" 2>&1 >/dev/null)"
+
+# canary-worker had osv red for over a week in October on its own lockfile. A gate that blamed
+# each release for that would have held every release, and soon been bypassed.
+check 'a job that fails on v1 and canary alike is not held against the release' \
+  'PASS  1 canary job(s) match v1 (1 fail on both and are not held against the release)' \
+  "$(canary_verdict "$(canary_jobs both 'stable-security / osv:failure' 'canary-security / osv:failure')")"
+
+check 'a job that ran on v1 but is missing on canary holds the release back' \
+  'missing canary-ci / test: stable-ci / test ran on v1 and canary has no such job' \
+  "$(canary_verdict "$(canary_jobs missing 'stable-ci / lint:success' 'canary-ci / lint:success' \
+    'stable-ci / test:success')" 2>&1 >/dev/null)"
+
+check 'a failing canary job with nothing on v1 to compare holds the release back' \
+  'unpaired canary-ci / audit: no stable-ci / audit ran to compare it with' \
+  "$(canary_verdict "$(canary_jobs unpaired 'canary-ci / audit:failure')" 2>&1 >/dev/null)"
+
+check 'a run where no canary job ran clears nothing' \
+  'rejected' \
+  "$(canary_verdict "$(canary_jobs skipped 'pending:success' 'stable-ci / lint:skipped' \
+    'canary-ci / lint:skipped')" >/dev/null 2>&1 && echo accepted || echo rejected)"
+
+CANARY_PUBLISHED="$(date -u -d 2026-10-29T12:00:00Z +%s)"
+
+# canary_promote_main against a stand-in gh. v1 is at aaa111 (v1.14.1); the canary tag is at
+# $1, ccc333 being v1.15.0, published at CANARY_PUBLISHED. $2 is the canary run found, or none.
+canary_with_gh() { # $1=canary sha or '', $2=run id or '', $3=jobs file, $4=now, $5...=main args
+  local canary_sha="$1" run_id="$2" jobs_file="$3" now="$4"
+  shift 4
+  : >"$TMP/canary-dispatch.log"
+  (
+    export PLATFORM_REPO=o/platform CANARY_REPO=o/canary-worker CANARY_NOW="$now"
+    gh() {
+      case "$*" in
+        'api repos/o/platform/git/ref/tags/canary '*) [ -n "$canary_sha" ] && echo "$canary_sha" ;;
+        'api repos/o/platform/git/ref/tags/v1 '*) echo aaa111 ;;
+        'api repos/o/platform/git/matching-refs/tags/v '*)
+          printf 'aaa111\trefs/tags/v1.14.1\nccc333\trefs/tags/v1.15.0\n' ;;
+        'api repos/o/platform/releases/tags/v1.15.0 '*) echo 2026-10-29T12:00:00Z ;;
+        'api repos/o/canary-worker/actions/workflows/canary.yml/runs?'*) echo "$run_id" ;;
+        'api repos/o/canary-worker/actions/runs/'*) cat "$jobs_file" ;;
+        'workflow run update-major-tag.yml '*) echo "$*" >>"$TMP/canary-dispatch.log" ;;
+        *) return 1 ;;
+      esac
+    }
+    canary_promote_main "$@" 2>&1
+  )
+}
+
+check 'with no canary tag yet there is nothing to promote' \
+  'nothing to promote: there is no canary tag yet' \
+  "$(canary_with_gh '' '' "$CANARY_CLEAN" "$CANARY_PUBLISHED")"
+
+check 'with v1 already at the canary release there is nothing to promote' \
+  'nothing to promote: v1 is already at the canary release' \
+  "$(canary_with_gh aaa111 '' "$CANARY_CLEAN" "$CANARY_PUBLISHED")"
+
+check 'a release whose canary run has not happened yet waits quietly' \
+  'waiting: no completed canary run of v1.15.0 yet' \
+  "$(canary_with_gh ccc333 '' "$CANARY_CLEAN" "$((CANARY_PUBLISHED + 3600))")"
+
+# Without this, a disabled canary.yml would leave v1 stuck on the old release with every
+# promote run green, which reads exactly like "nothing to do".
+check 'a release that has waited six hours with no canary run fails the promotion' \
+  'v1.15.0 has waited over 6 hours with no canary run; check canary.yml in o/canary-worker' \
+  "$(canary_with_gh ccc333 '' "$CANARY_CLEAN" "$((CANARY_PUBLISHED + 7 * 3600))")"
+
+check 'a cleared release dispatches the move of v1 to that release' \
+  'workflow run update-major-tag.yml --repo o/platform --ref main -f tag=v1.15.0' \
+  "$(canary_with_gh ccc333 9001 "$CANARY_CLEAN" "$((CANARY_PUBLISHED + 3600))" >/dev/null &&
+     cat "$TMP/canary-dispatch.log")"
+
+check 'a release the canary run did not clear leaves v1 where it is' \
+  'held, nothing dispatched' \
+  "$(canary_with_gh ccc333 9001 "$CANARY_REGRESSED" "$((CANARY_PUBLISHED + 3600))" >/dev/null ||
+     { [ -s "$TMP/canary-dispatch.log" ] && echo dispatched || echo 'held, nothing dispatched'; })"
+
+check 'a dry run judges the release and moves nothing' \
+  'dry run: would move v1 to v1.15.0|nothing dispatched' \
+  "$(out="$(canary_with_gh ccc333 9001 "$CANARY_CLEAN" "$((CANARY_PUBLISHED + 3600))" --dry-run)" &&
+     printf '%s|%s' "$(tail -n1 <<<"$out")" \
+       "$([ -s "$TMP/canary-dispatch.log" ] && echo dispatched || echo 'nothing dispatched')")"
+
+# Property, not instance: every release fired `release: published` (release-please publishes
+# with AUTOMATION_TOKEN), so a trigger left on update-major-tag.yml would move v1 the moment a
+# release is cut and the canary would decide nothing.
+check 'v1 moves only by dispatch, and only promote-canary.yml refers to that workflow' \
+  'workflow_dispatch|promote-canary.yml' \
+  "$(python3 - "$PLATFORM_ROOT/.github/workflows" <<'PY' 2>/dev/null
+import pathlib, sys, yaml
+root = pathlib.Path(sys.argv[1])
+doc = yaml.safe_load((root / "update-major-tag.yml").read_text())
+triggers = doc.get("on", doc.get(True))
+callers = sorted(path.name for path in root.glob("*.yml")
+                 if path.name != "update-major-tag.yml" and "update-major-tag.yml" in path.read_text())
+print(",".join(sorted(triggers)) + "|" + ",".join(callers))
+PY
+)"
+
 printf '\n%d passed, %d failed\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]
