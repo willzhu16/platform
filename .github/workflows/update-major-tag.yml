@@ -1,18 +1,16 @@
 name: update-major-tag
 
 # Implements the version-pin contract (D-18, spec 01 §2.4): consumers reference the
-# moving major tag `@v1`. When release-please publishes a release (e.g. v1.4.2), this
-# force-moves `v1` to that commit, so consumers get fixes automatically and breakage
-# only ever arrives by an explicit major bump.
+# moving major tag `@v1`. Given a release (e.g. v1.4.2), this force-moves `v1` to that
+# commit, so consumers get fixes automatically and breakage only ever arrives by an
+# explicit major bump.
 #
-# release-please cuts its releases with GITHUB_TOKEN, whose events never trigger other
-# workflows — so release-platform.yml dispatches this workflow explicitly after
-# publishing (workflow_dispatch is the documented exception to that suppression). The
-# `release: published` trigger is kept for releases cut by hand or with a PAT.
+# Dispatch only. promote-canary.yml calls it once canary-worker has run the release, and a
+# person can call it to move v1 at once, for an urgent fix or to roll back. It used to fire
+# on `release: published` as well, and because release-please publishes with
+# AUTOMATION_TOKEN that event fired on every release, moving v1 before anything had run it.
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       tag:

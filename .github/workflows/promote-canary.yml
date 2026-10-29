@@ -1,0 +1,41 @@
+name: promote-canary
+
+# The second half of a release. release-platform.yml moves the `canary` tag onto each new
+# release; this moves `v1`, the tag every repo pins, only after canary-worker has run the
+# release and nothing that passes on v1 failed on it (scripts/canary-promote.sh has the rule).
+# Runs half an hour after canary-worker's hourly canary.yml, reads only public data, and
+# dispatches update-major-tag.yml as its one write.
+#
+# Red here means v1 is being held: either the canary run found a regression (the log names
+# the job), or no canary run has happened for hours. Fix forward with another release, or
+# move v1 by hand: gh workflow run update-major-tag.yml -f tag=vX.Y.Z
+
+on:
+  schedule:
+    - cron: '47 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Judge the latest canary run without moving v1
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: write # dispatches update-major-tag.yml
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Promote the canary release if canary-worker cleared it
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PLATFORM_REPO: ${{ github.repository }}
+          CANARY_REPO: ${{ github.repository_owner }}/canary-worker
+          DRY_RUN: ${{ inputs.dry-run && '--dry-run' || '' }}
+        run: |
+          # shellcheck disable=SC2086 # DRY_RUN is empty or a single flag
+          bash scripts/canary-promote.sh $DRY_RUN

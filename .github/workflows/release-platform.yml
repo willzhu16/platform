@@ -3,16 +3,16 @@ name: release-platform
 # release-please for platform itself (spec 01 §6.2, D-14/D-18). On every push to main it
 # maintains a running "chore: release vX.Y.Z" PR from Conventional Commits; merging that
 # PR (a human-only action) tags vX.Y.Z and cuts a GitHub Release with a changelog. This
-# workflow then dispatches update-major-tag.yml, which moves the `v1` tag consumers pin.
+# workflow then moves the `canary` tag onto the release. `v1`, the tag every repo pins,
+# follows only after canary-worker has run it: promote-canary.yml makes that call.
 
 on:
   push:
     branches: [main]
 
 permissions:
-  contents: write
+  contents: write # release-please's tags and the canary tag
   pull-requests: write
-  actions: write # the handover step dispatches update-major-tag.yml
 
 jobs:
   release-please:
@@ -30,13 +30,20 @@ jobs:
           token: ${{ secrets.AUTOMATION_TOKEN || github.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
-      - name: Move the v1 tag consumers pin
-        # Releases cut with GITHUB_TOKEN never fire `release: published` workflows
-        # (GitHub suppresses GITHUB_TOKEN-created events — workflow_dispatch is the
-        # documented exception), so hand over to update-major-tag.yml explicitly.
+      - name: Move the canary tag onto the release
+        # Not v1: 1.13.1 broke `security / semgrep` in every repo the moment v1 moved onto it.
+        # canary-worker's hourly canary.yml runs the shared workflows at @canary beside @v1,
+        # and promote-canary.yml moves v1 once nothing passing on v1 fails on canary.
         if: ${{ steps.release.outputs.release_created == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           TAG: ${{ steps.release.outputs.tag_name }}
-        run: gh workflow run update-major-tag.yml --ref main -f "tag=$TAG"
+        run: |
+          sha="$(gh api "repos/$GH_REPO/git/ref/tags/$TAG" --jq .object.sha)"
+          if gh api "repos/$GH_REPO/git/ref/tags/canary" >/dev/null 2>&1; then
+            gh api -X PATCH "repos/$GH_REPO/git/refs/tags/canary" -f sha="$sha" -F force=true >/dev/null
+          else
+            gh api -X POST "repos/$GH_REPO/git/refs" -f ref=refs/tags/canary -f sha="$sha" >/dev/null
+          fi
+          echo "canary -> $TAG ($sha); v1 moves when promote-canary.yml clears it"

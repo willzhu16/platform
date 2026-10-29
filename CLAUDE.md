@@ -33,8 +33,12 @@ service to run; the deploy target is GitHub itself.
   - Repo-local: `selftest.yml` (runs on every PR with a `selftest-complete` aggregate gate —
     actionlint + shellcheck +
     runs ci/ci-python against the fixtures + copier-renders both templates and runs their
-    gates), `release-platform.yml` (release-please), `update-major-tag.yml` (force-moves
-    `v1` onto a published `vX.Y.Z`; regex-guarded), `cadence.yml` (scheduled maintenance
+    gates), `release-platform.yml` (release-please; then moves the `canary` tag, NOT `v1`),
+    `promote-canary.yml` (hourly: moves `v1` onto the canary release once canary-worker's
+    `canary.yml` run shows nothing passing at `@v1` fails at `@canary`; rule and tests in
+    `scripts/canary-promote.sh`), `update-major-tag.yml` (force-moves `v1` onto a given
+    `vX.Y.Z`; dispatch only, regex-guarded; dispatching it by hand is the urgent-fix and
+    rollback path, skipping the canary), `cadence.yml` (scheduled maintenance
     issues; checklist text duplicated from `handbook/cadences.md` — keep in sync),
     `history-scan.yml` (manual full-history gitleaks; hardcodes `<owner>/platform`).
 - `copier.yml` — the single question set for all templates (template, project_name,
@@ -59,7 +63,9 @@ service to run; the deploy target is GitHub itself.
   committed), `osv-coverage.sh` (fails `security / osv` when osv-scanner skipped a committed
   `pnpm-lock.yaml`/`uv.lock` or read under 90% of its packages, as 2.3.8 did with pnpm 12;
   also a STEP, fed by a second scanner run with `--all-packages`, and mirrored by selftest's
-  `test-osv-coverage` job with the same pin). Their pure string-building logic lives in
+  `test-osv-coverage` job with the same pin), `template-sync.sh` (the `copier update` behind
+  `template-sync.yml`), `canary-promote.sh` (the canary verdict and v1 promotion behind
+  `promote-canary.yml`). Their pure string-building logic lives in
   `lib.sh`, regression-tested by `tests.sh` (`bash scripts/tests.sh`; needs jq +
   python3/PyYAML — safe to run, touches nothing). Shellcheck + the tests are gated by selftest.
 - `fleet/unmanaged.json` — the repos deliberately outside the harness, each with a reason,
