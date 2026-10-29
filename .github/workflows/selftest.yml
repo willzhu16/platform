@@ -257,6 +257,8 @@ jobs:
           git clone -q "$GITHUB_WORKSPACE" "$RUNNER_TEMP/platform-src"
           uvx --from copier copier copy --quiet --defaults --vcs-ref "$previous" \
             --data-file "$RUNNER_TEMP/answers.yml" "$RUNNER_TEMP/platform-src" synced
+          # As new-project.sh does: copier records `v1` here otherwise (lib.sh says why).
+          pin_template_commit synced/.copier-answers.yml "$previous"
           git -C synced init -q
           git -C synced add -A
           git -C synced -c user.name=selftest -c user.email=selftest@invalid commit -qm render
