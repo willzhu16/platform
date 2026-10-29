@@ -139,11 +139,17 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
-          python-version: '3.15'
+          python-version: '3.13' # mirrors security.yml; tests.sh asserts they match
       - name: Install semgrep (OSS engine)
         run: pip install "semgrep==${SEMGREP_VERSION}"
       - name: Test the shared rules against their fixtures
         run: semgrep --test --metrics=off security/semgrep
+      # One --test run is not enough to see the engine break. Under Python 3.15, semgrep-core
+      # 1.168.0 crashed on most invocations ("failed to create domain backup thread"), and a
+      # single --test happened to pass on several PRs while `security / semgrep` failed in
+      # canary-worker. This is the scan security.yml runs, with the same flags, on the fixture.
+      - name: Scan a real project the way security.yml does
+        run: semgrep scan --config security/semgrep --error --metrics=off --no-git-ignore selftest-fixture
 
   # security/gitleaks.toml had no gate at all. A custom rule that stops matching produces a
   # clean scan indistinguishable from a genuinely clean one — exactly how the ntfy rule came
