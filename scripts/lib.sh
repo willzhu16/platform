@@ -34,6 +34,15 @@ newest_release_tag() {
   { grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true; } | sort -V | tail -1
 }
 
+# Print the newest plain vX.Y.Z tag that points at commit $1, reading `git ls-remote --tags`
+# output on stdin, or nothing. The moving tags (`v1`, `canary`) point at the same commit as
+# the release they were moved onto, so they are filtered out by name, and an annotated tag's
+# peeled `^{}` line counts as the tag itself.
+release_tag_at() { # $1=commit sha
+  awk -v sha="$1" '$1 == sha { ref = $2; sub(/^refs\/tags\//, "", ref); sub(/\^\{\}$/, "", ref); print ref }' |
+    newest_release_tag
+}
+
 # Print $1's dotted version, or nothing if it has none. Never returns non-zero: under
 # `set -euo pipefail` a bare assignment whose pipeline fails aborts the caller, and grep
 # exits 1 when a tool prints no dotted version to stdout (gitleaks, age). The self-check

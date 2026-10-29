@@ -21,6 +21,11 @@ service to run; the deploy target is GitHub itself.
     actionlint 1.7.7 doesn't know — suppressed in `.github/actionlint.yml`, don't "fix").
   - `athena-sync.yml` — weekly drift sync: checks out `<owner>/athena@v1`, recompiles the
     caller's instruction files, opens/updates one `chore/athena-sync` PR on drift.
+  - `template-sync.yml` — weekly `copier update` to the release `v1` points at (resolved by
+    commit, never the moving tag), via `scripts/template-sync.sh`; opens/updates one
+    `chore/template-sync` PR, listing files left with conflict markers. Callers name the job
+    `template`. selftest's `test-template-sync` renders each template at the last release and
+    syncs it to the PR's HEAD, so a template change an existing repo cannot take fails there.
   - `release.yml` — tag-driven build+optional Cloudflare deploy (`release / build|deploy`);
     `preview.yml` — per-PR `wrangler versions upload` + sticky comment (`preview / deploy`).
   - `codeql.yml` — single `analyze` job (deliberately not a matrix; keeps the frozen
@@ -104,7 +109,7 @@ service to run; the deploy target is GitHub itself.
 ## Gotchas (verified 2026-07-11)
 
 - **Frozen contract (D-18, breaking to rename):** consumer job ids (`ci`, `security`,
-  `release`, `preview`, `codeql`, `sync`), the check names in `rulesets/main.json`, the
+  `release`, `preview`, `codeql`, `sync`, `template`), the check names in `rulesets/main.json`, the
   `lint`/`typecheck`/`test` script contract, reusable-workflow input names, and plain
   `vX.Y.Z` tags (the moving `v1` depends on the shape).
 - Optional `AUTOMATION_TOKEN` (PAT/App token) makes bot-created PRs trigger CI. Without

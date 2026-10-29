@@ -13,7 +13,8 @@ The workflow embeds a copy of these checklists (`CHECKLISTS`); edit both togethe
 
 ## Monthly (1st)
 
-- [ ] **`copier update` sweep** — pull template fixes into every active repo as diffs.
+- [ ] **Template sync PRs** — `template-sync.yml` opens one in each repo weekly; resolve any
+      that copier left with conflict markers.
 - [ ] **Semgrep rules + vendored actions review** — bump the vendored copies via PR.
 - [ ] **Expired osv-ignores** — grep for lapsed suppression dates; re-triage or remove.
 - [ ] **Session-log harvest** — read the month's agent session logs; convert recurring

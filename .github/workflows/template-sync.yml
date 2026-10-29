@@ -1,0 +1,127 @@
+name: template-sync-reusable
+
+# Weekly template sync, the third propagation channel automated. Workflow bodies reach a repo
+# through the moving tag and instruction files through athena-sync, but template files (the
+# caller workflows, configs, scaffolding) only arrive through `copier update`, which was a
+# monthly checklist item nobody ran: canary-worker sat at v1.7.0 for seven releases.
+#
+# This updates the caller repo to the platform release `v1` points at and opens ONE PR with
+# the diff, force-pushing the same branch on re-runs so there is never more than one. Files
+# copier cannot merge keep inline conflict markers and are listed in the PR, which then fails
+# its own lint until a person resolves them. Callers name their job `template`.
+#
+# Same token caveat as athena-sync: opened with GITHUB_TOKEN, the PR's checks wait until a
+# human closes and reopens it; AUTOMATION_TOKEN avoids that.
+
+on:
+  workflow_call:
+    secrets:
+      AUTOMATION_TOKEN:
+        # Optional, as in athena-sync.yml: a PAT or App token, so the PR opens with its checks
+        # already running. Callers pass AUTOMATION_TOKEN by name.
+        required: false
+
+permissions:
+  contents: write # commit + force-push the chore/template-sync branch
+  pull-requests: write # open the sync PR
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          token: ${{ secrets.AUTOMATION_TOKEN || github.token }}
+      - name: Resolve platform repo ref
+        id: platform
+        # A reusable workflow's `github.*` context is the CALLER's, so read the `job`
+        # context: `job.workflow_repository`/`job.workflow_sha` identify the repo + commit
+        # of the workflow file defining THIS job: platform at the consumer's pinned ref.
+        run: |
+          echo "repository=${{ job.workflow_repository }}" >> "$GITHUB_OUTPUT"
+          echo "ref=${{ job.workflow_sha }}" >> "$GITHUB_OUTPUT"
+      - name: Fetch the sync script from platform
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ steps.platform.outputs.repository }}
+          ref: ${{ steps.platform.outputs.ref }}
+          sparse-checkout: |
+            scripts/template-sync.sh
+            scripts/lib.sh
+          sparse-checkout-cone-mode: false
+          path: .artemis-platform
+      - name: Resolve the release v1 points at
+        id: target
+        env:
+          PLATFORM_REPO: ${{ steps.platform.outputs.repository }}
+          PLATFORM_SHA: ${{ steps.platform.outputs.ref }}
+        # copier needs a concrete release, never the moving tag: a repo recording `v1` would
+        # later be compared against itself and updated with nothing.
+        run: |
+          # copier refuses to run in a repo with untracked files, so the script leaves first.
+          mv .artemis-platform "$RUNNER_TEMP/artemis-platform"
+          # shellcheck source=/dev/null
+          . "$RUNNER_TEMP/artemis-platform/scripts/lib.sh"
+          tag="$(git ls-remote --tags "https://github.com/${PLATFORM_REPO}.git" |
+            release_tag_at "$PLATFORM_SHA")"
+          if [ -z "$tag" ]; then
+            echo "::error::no vX.Y.Z release tag points at ${PLATFORM_SHA}"
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      # Only for refreshing pnpm-lock.yaml when the update touches package.json.
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        if: hashFiles('package.json') != ''
+        with:
+          package_json_file: package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        if: hashFiles('package.json') != ''
+        with:
+          node-version: '24'
+      - name: Update the template files
+        id: sync
+        env:
+          TAG: ${{ steps.target.outputs.tag }}
+        run: |
+          result="$(bash "$RUNNER_TEMP/artemis-platform/scripts/template-sync.sh" "$TAG" .)"
+          echo "$result"
+          echo "result=$result" >> "$GITHUB_OUTPUT"
+      - name: Open or update the sync PR
+        if: ${{ !startsWith(steps.sync.outputs.result, 'current') }}
+        env:
+          GH_TOKEN: ${{ secrets.AUTOMATION_TOKEN || github.token }}
+          TAG: ${{ steps.target.outputs.tag }}
+          RESULT: ${{ steps.sync.outputs.result }}
+          PLATFORM_REPO: ${{ steps.platform.outputs.repository }}
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "copier changed nothing"
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B chore/template-sync
+          git add -A
+          git commit -m "chore: update template files to platform ${TAG}"
+          git push -f origin chore/template-sync
+          note='Merge to converge. Your own edits to template files were kept wherever copier could merge them.'
+          if [[ "$RESULT" == conflicts* ]]; then
+            note="Copier could not merge some files and left conflict markers in them: ${RESULT#*: }. Resolve those before merging; lint fails until you do."
+          fi
+          if [ -z "$(gh pr list --head chore/template-sync --state open --json number --jq '.[].number')" ]; then
+            gh pr create \
+              --title "chore: update template files to platform ${TAG}" \
+              --body "$(printf '%s\n\n%s\n\n%s\n%s' \
+                "Weekly template sync (${RESULT%%:*}): this repo's template files updated to ${PLATFORM_REPO}@${TAG}. Release notes: https://github.com/${PLATFORM_REPO}/releases" \
+                "$note" \
+                '> [!NOTE]' \
+                '> If this PR shows no checks it was opened with GITHUB_TOKEN, whose events cannot trigger workflows. Close and reopen it to run them, and set the AUTOMATION_TOKEN secret to stop it recurring.')"
+          else
+            gh pr edit chore/template-sync --title "chore: update template files to platform ${TAG}"
+          fi
