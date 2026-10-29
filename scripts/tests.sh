@@ -1193,7 +1193,8 @@ canary_with_gh() { # $1=canary sha or '', $2=run id or '', $3=jobs file, $4=now,
         'api repos/o/platform/git/matching-refs/tags/v '*)
           printf 'aaa111\trefs/tags/v1.14.1\nccc333\trefs/tags/v1.15.0\n' ;;
         'api repos/o/platform/releases/tags/v1.15.0 '*) echo 2026-10-29T12:00:00Z ;;
-        'api repos/o/canary-worker/actions/workflows/canary.yml/runs?'*) echo "$run_id" ;;
+        'api repos/o/canary-worker/actions/workflows/canary.yml/runs?'*)
+          [ "$run_id" != unreadable ] && echo "$run_id" ;;
         'api repos/o/canary-worker/actions/runs/'*) cat "$jobs_file" ;;
         'workflow run update-major-tag.yml '*) echo "$*" >>"$TMP/canary-dispatch.log" ;;
         *) return 1 ;;
@@ -1220,6 +1221,10 @@ check 'a release whose canary run has not happened yet waits quietly' \
 check 'a release that has waited six hours with no canary run fails the promotion' \
   'v1.15.0 has waited over 6 hours with no canary run; check canary.yml in o/canary-worker' \
   "$(canary_with_gh ccc333 '' "$CANARY_CLEAN" "$((CANARY_PUBLISHED + 7 * 3600))")"
+
+check 'a failed read of the canary runs fails loudly instead of passing for not run yet' \
+  'could not read canary runs from o/canary-worker' \
+  "$(canary_with_gh ccc333 unreadable "$CANARY_CLEAN" "$((CANARY_PUBLISHED + 3600))")"
 
 check 'a cleared release dispatches the move of v1 to that release' \
   'workflow run update-major-tag.yml --repo o/platform --ref main -f tag=v1.15.0' \

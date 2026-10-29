@@ -96,8 +96,12 @@ canary_promote_main() {
   now="${CANARY_NOW:-$(date +%s)}"
   since="$(date -u -d "@$((published + CANARY_SETTLE_SECONDS))" +%Y-%m-%dT%H:%M:%SZ)"
   query="status=completed&created=%3E%3D$since&per_page=1"
-  run="$(gh api "repos/$canary_repo/actions/workflows/canary.yml/runs?$query" \
-    --jq '.workflow_runs[0].id // empty')"
+  # A failed read must not pass for "no run yet": that would wait quietly, then blame canary.yml.
+  if ! run="$(gh api "repos/$canary_repo/actions/workflows/canary.yml/runs?$query" \
+    --jq '.workflow_runs[0].id // empty')"; then
+    echo "could not read canary runs from $canary_repo" >&2
+    return 1
+  fi
   if [ -z "$run" ]; then
     if [ $((now - published)) -gt "$CANARY_MAX_WAIT_SECONDS" ]; then
       printf '%s has waited over %s hours with no canary run; check canary.yml in %s\n' \
@@ -109,8 +113,11 @@ canary_promote_main() {
   fi
   local jobs verdict
   jobs="$(mktemp)"
-  gh api "repos/$canary_repo/actions/runs/$run/jobs?per_page=100" \
-    --jq '[.jobs[] | {name, conclusion}]' >"$jobs"
+  if ! gh api "repos/$canary_repo/actions/runs/$run/jobs?per_page=100" \
+    --jq '[.jobs[] | {name, conclusion}]' >"$jobs"; then
+    echo "could not read the jobs of canary run $run" >&2
+    return 1
+  fi
   if ! verdict="$(canary_verdict "$jobs")"; then
     echo "holding v1: canary run $run did not clear $tag" >&2
     return 1
