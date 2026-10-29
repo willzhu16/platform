@@ -1009,5 +1009,138 @@ print("same" if security[0] and security[1] and security == selftest else f"{sec
 PY
 )"
 
+# --- template sync ----------------------------------------------------------------------
+#
+# copier is stood in for here, as gh is for the fleet audit, so these pin the decisions made
+# around it. selftest's test-template-sync job runs the real copier on both templates.
+
+# shellcheck source=scripts/template-sync.sh
+. "$SCRIPT_DIR/template-sync.sh"
+
+# A committed repo that records template version $2, holding the given files.
+tsync_fixture() { # $1=name, $2=recorded _commit, $3...=relative-path:content
+  local name="$1" recorded="$2"; shift 2
+  local root="$TMP/tsync-$name"
+  rm -rf "$root"
+  mkdir -p "$root"
+  git -C "$root" init -q
+  printf '_commit: %s\n_src_path: gh:willzhu16/platform\n' "$recorded" >"$root/.copier-answers.yml"
+  local pair path
+  for pair in "$@"; do
+    path="$root/${pair%%:*}"
+    mkdir -p "$(dirname "$path")"
+    printf '%s\n' "${pair#*:}" >"$path"
+  done
+  git -C "$root" add -A
+  git -C "$root" -c user.name=t -c user.email=t@invalid commit -qm init
+  printf '%s\n' "$root"
+}
+
+# template_sync_main with copier replaced by the function named $1, run inside the repo.
+tsync_with() { # $1=stand-in function, $2=target ref, $3=repo
+  local stand_in="$1"
+  (
+    template_sync_copier() { "$stand_in" "$@"; }
+    template_sync_main "$2" "$3" 2>/dev/null
+  )
+}
+
+copier_updates() { printf 'v2\n' >README.md; sed -i 's/^_commit: .*/_commit: v1.14.1/' .copier-answers.yml; }
+copier_conflicts() {
+  printf '<<<<<<< before updating\nmine\n=======\ntheirs\n>>>>>>> after updating\n' >biome.json
+}
+copier_rejects() { printf 'hunk\n' >ci.yml.rej; }
+copier_marks_run() { touch .copier-ran; }
+copier_fails() { return 1; }
+# What copier did in CI on 2026-10-29: asked for a release, it recorded a moving tag instead.
+copier_records_canary() { sed -i 's/^_commit: .*/_commit: canary/' .copier-answers.yml; }
+
+TSYNC_TAGS="$(printf '%s\n' \
+  $'aaa111\trefs/tags/v1' $'aaa111\trefs/tags/canary' $'aaa111\trefs/tags/v1.14.1' \
+  $'bbb222\trefs/tags/v1.14.0' $'fff666\trefs/tags/v1.12.0' $'ddd444\trefs/tags/v1.12.0^{}')"
+
+echo '== template sync (scripts/template-sync.sh)'
+
+check 'the release a moving tag points at is found by commit, the moving tags ignored' \
+  'v1.14.1' \
+  "$(release_tag_at aaa111 <<<"$TSYNC_TAGS")"
+
+check 'an annotated release tag is found through its peeled commit line' \
+  'v1.12.0' \
+  "$(release_tag_at ddd444 <<<"$TSYNC_TAGS")"
+
+check 'a commit no release tag points at gives nothing' \
+  '' \
+  "$(release_tag_at eee555 <<<"$TSYNC_TAGS")"
+
+check 'the recorded template version is read with or without quotes' \
+  'v1.7.0' \
+  "$(root="$(tsync_fixture quoted v1.0.0)" &&
+     printf "_commit: 'v1.7.0'\n" >"$root/.copier-answers.yml" && template_sync_recorded "$root")"
+
+check 'a repo already on the target release runs nothing' \
+  'current v1.14.1
+not run' \
+  "$(root="$(tsync_fixture current v1.14.1 'README.md:v1')" &&
+     tsync_with copier_marks_run v1.14.1 "$root" &&
+     { [ -e "$root/.copier-ran" ] && echo ran || echo 'not run'; })"
+
+check 'a clean update reports the versions it moved between' \
+  'updated v1.7.0 -> v1.14.1' \
+  "$(tsync_with copier_updates v1.14.1 "$(tsync_fixture clean v1.7.0 'README.md:v1')")"
+
+check 'files copier left conflict markers in are reported by name' \
+  'conflicts v1.7.0 -> v1.14.1: biome.json' \
+  "$(tsync_with copier_conflicts v1.14.1 "$(tsync_fixture marked v1.7.0 'biome.json:{}')")"
+
+check 'a .rej file copier left is reported as a conflict' \
+  'conflicts v1.7.0 -> v1.14.1: ci.yml.rej' \
+  "$(tsync_with copier_rejects v1.14.1 "$(tsync_fixture rejected v1.7.0 'ci.yml:on: push')")"
+
+check 'a release is pinned over the moving tag copier recorded' \
+  '_commit: v1.15.0' \
+  "$(root="$(tsync_fixture pin v1)" &&
+     pin_template_commit "$root/.copier-answers.yml" v1.15.0 && grep '^_commit' "$root/.copier-answers.yml")"
+
+check 'a ref that is not a release, like HEAD, is left as copier recorded it' \
+  '_commit: v1.14.1-1-gec08a5d' \
+  "$(root="$(tsync_fixture head v1.14.1-1-gec08a5d)" &&
+     pin_template_commit "$root/.copier-answers.yml" HEAD && grep '^_commit' "$root/.copier-answers.yml")"
+
+# Regression: a render asked for v1.14.1 recorded `v1` in CI, because `git describe` took the
+# first of the tags on that commit. Recorded as-is, the next sync updates from a moving tag to
+# itself and applies nothing, which is how the monthly sweep stayed broken until 2026-09-11.
+check 'a sync records the release it was asked for, not the moving tag copier wrote' \
+  'updated v1.7.0 -> v1.15.0|_commit: v1.15.0' \
+  "$(root="$(tsync_fixture records v1.7.0 'README.md:v1')" &&
+     printf '%s|%s' "$(tsync_with copier_records_canary v1.15.0 "$root")" \
+       "$(grep '^_commit' "$root/.copier-answers.yml")")"
+
+check 'a copier failure fails the sync instead of passing for current' \
+  'rejected' \
+  "$(tsync_with copier_fails v1.14.1 "$(tsync_fixture broken v1.7.0 'README.md:v1')" >/dev/null &&
+     echo accepted || echo rejected)"
+
+# A stand-in pnpm that only records that it ran, so the decision is tested and not pnpm.
+mkdir -p "$TMP/fake-pnpm"
+printf '#!/usr/bin/env bash\ntouch .pnpm-ran\n' >"$TMP/fake-pnpm/pnpm"
+chmod +x "$TMP/fake-pnpm/pnpm"
+
+# Generated repos commit a lockfile the template never ships, so an update that changes
+# package.json leaves it stale, and CI's frozen install fails before anything is checked.
+check 'an update that changes package.json refreshes the pnpm lockfile' \
+  'refreshed' \
+  "$(root="$(tsync_fixture lock-stale v1.7.0 'package.json:{}' 'pnpm-lock.yaml:x')" &&
+     printf '{"name":"x"}\n' >"$root/package.json" &&
+     PATH="$TMP/fake-pnpm:$PATH" template_sync_refresh_lockfiles "$root" 2>/dev/null &&
+     { [ -e "$root/.pnpm-ran" ] && echo refreshed || echo untouched; })"
+
+check 'an update that leaves package.json alone leaves the lockfile alone' \
+  'untouched' \
+  "$(root="$(tsync_fixture lock-fresh v1.7.0 'package.json:{}' 'pnpm-lock.yaml:x')" &&
+     printf 'v2\n' >"$root/README.md" &&
+     PATH="$TMP/fake-pnpm:$PATH" template_sync_refresh_lockfiles "$root" 2>/dev/null &&
+     { [ -e "$root/.pnpm-ran" ] && echo refreshed || echo untouched; })"
+
 printf '\n%d passed, %d failed\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]

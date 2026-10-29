@@ -11,7 +11,7 @@ Non-negotiable rules (duplicated here in case you skip the pointer):
 - Never push, tag, or create GitHub releases; never commit to `main` — feature branch + PR
   with conventional-commit messages (commitlint gates CI).
 - Frozen contract (breaking to rename): consumer job ids `ci|security|release|preview|
-  codeql|sync`, check names `ci / lint|typecheck|test|commits` and
+  codeql|sync|template`, check names `ci / lint|typecheck|test|commits` and
   `security / gitleaks|semgrep|osv`, the `lint`/`typecheck`/`test` package-script contract,
   reusable-workflow input names, and plain `vX.Y.Z` release tags.
 - Never run `scripts/new-project.sh` or `scripts/setup-machine.sh` as a test — they create

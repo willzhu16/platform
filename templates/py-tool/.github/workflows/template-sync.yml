@@ -1,0 +1,18 @@
+name: template-sync
+
+on:
+  schedule:
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  template:
+    uses: willzhu16/platform/.github/workflows/template-sync.yml@v1
+    # Forwards AUTOMATION_TOKEN when this repo has it, so the sync PR opens with its
+    # checks already running instead of needing a close and reopen.
+    secrets:
+      AUTOMATION_TOKEN: ${{ secrets.AUTOMATION_TOKEN }}

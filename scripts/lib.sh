@@ -34,6 +34,25 @@ newest_release_tag() {
   { grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true; } | sort -V | tail -1
 }
 
+# Print the newest plain vX.Y.Z tag that points at commit $1, reading `git ls-remote --tags`
+# output on stdin, or nothing. The moving tags (`v1`, `canary`) point at the same commit as
+# the release they were moved onto, so they are filtered out by name, and an annotated tag's
+# peeled `^{}` line counts as the tag itself.
+release_tag_at() { # $1=commit sha
+  awk -v sha="$1" '$1 == sha { ref = $2; sub(/^refs\/tags\//, "", ref); sub(/\^\{\}$/, "", ref); print ref }' |
+    newest_release_tag
+}
+
+# Record release $2 as the template version in copier answers file $1, whatever copier wrote.
+# copier fills `_commit` from `git describe --tags`, which takes the first name in sort order
+# when several tags point at one commit, and at a release commit that is `canary` or `v1`: on
+# 2026-10-29 a render asked for v1.14.1 recorded `v1` in CI. A repo recording a moving tag is
+# later updated against itself and receives nothing. Anything but a plain vX.Y.Z is left alone.
+pin_template_commit() { # $1=answers file, $2=ref copier was asked for
+  grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' <<<"$2" || return 0
+  sed -i "s/^_commit:.*/_commit: $2/" "$1"
+}
+
 # Print $1's dotted version, or nothing if it has none. Never returns non-zero: under
 # `set -euo pipefail` a bare assignment whose pipeline fails aborts the caller, and grep
 # exits 1 when a tool prints no dotted version to stdout (gitleaks, age). The self-check

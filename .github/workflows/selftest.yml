@@ -53,7 +53,7 @@ jobs:
             --severity=warning scripts/new-project.sh scripts/setup-machine.sh
             scripts/adopt-project.sh scripts/lib.sh scripts/tests.sh scripts/session-log.sh
             scripts/sandbox-check.sh scripts/fleet-audit.sh scripts/sops-check.sh
-            scripts/sops-bootstrap.sh scripts/osv-coverage.sh
+            scripts/sops-bootstrap.sh scripts/osv-coverage.sh scripts/template-sync.sh
 
   # scripts/tests.sh regression-tests the pure logic extracted into scripts/lib.sh — the
   # entry scripts themselves can never run in CI (they create real GitHub repos / mutate
@@ -220,6 +220,77 @@ jobs:
             ./
       - name: Verify osv-scanner read every lockfile
         run: bash scripts/osv-coverage.sh .artemis-osv-packages.json
+
+  # template-sync.yml carries every template change into existing repos with copier update, so
+  # the question for each template change is whether a repo generated from the last release
+  # can take it. This renders that release, syncs it to this commit with the same script, and
+  # runs the result's gates. A change that conflicts or breaks an upgraded repo fails here,
+  # instead of in a sync PR in every repo of the fleet.
+  test-template-sync:
+    strategy:
+      fail-fast: false
+      matrix:
+        template: [cf-worker-app, py-tool]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0 # copier renders from git refs, and the last release is a tag
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - name: Render the last release, then sync it to this commit
+        env:
+          TEMPLATE: ${{ matrix.template }}
+        run: |
+          # shellcheck source=/dev/null
+          . scripts/lib.sh
+          previous="$(git tag --list 'v*' | newest_release_tag)"
+          if [ -z "$previous" ]; then
+            echo "::error::no vX.Y.Z tag to render the last release from"
+            exit 1
+          fi
+          printf '%s\n' "template: $TEMPLATE" 'project_name: sync-check' \
+            'description: selftest template sync' 'visibility: public' > "$RUNNER_TEMP/answers.yml"
+          # copier copies a local source's uncommitted state along with it, and `synced` below
+          # would be part of that state, as a nested repo it then fails to treat as a submodule.
+          # A clean clone of this commit is the source instead; real repos use gh:, unaffected.
+          git clone -q "$GITHUB_WORKSPACE" "$RUNNER_TEMP/platform-src"
+          uvx --from copier copier copy --quiet --defaults --vcs-ref "$previous" \
+            --data-file "$RUNNER_TEMP/answers.yml" "$RUNNER_TEMP/platform-src" synced
+          # As new-project.sh does: copier records `v1` here otherwise (lib.sh says why).
+          pin_template_commit synced/.copier-answers.yml "$previous"
+          git -C synced init -q
+          git -C synced add -A
+          git -C synced -c user.name=selftest -c user.email=selftest@invalid commit -qm render
+          result="$(bash scripts/template-sync.sh HEAD synced)"
+          echo "$result"
+          case "$result" in
+            updated*) ;;
+            *) echo "::error::syncing $previous to this commit did not apply cleanly: $result"; exit 1 ;;
+          esac
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        if: matrix.template == 'cf-worker-app'
+        with:
+          package_json_file: synced/package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        if: matrix.template == 'cf-worker-app'
+        with:
+          node-version: '24'
+      - name: Run the synced project's gates
+        working-directory: synced
+        run: |
+          if [ -f package.json ]; then
+            pnpm install
+            pnpm lint
+            pnpm typecheck
+            pnpm test
+          else
+            uv sync
+            uv run ruff check .
+            uv run ruff format --check .
+            uv run pyright
+            uv run pytest --cov
+          fi
 
   ci:
     uses: ./.github/workflows/ci.yml
@@ -474,6 +545,7 @@ jobs:
       - test-semgrep-rules
       - test-gitleaks-rules
       - test-osv-coverage
+      - test-template-sync
       - ci
       - ci-python
       - render-cf-worker-app
