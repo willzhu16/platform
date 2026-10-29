@@ -1052,6 +1052,8 @@ copier_conflicts() {
 copier_rejects() { printf 'hunk\n' >ci.yml.rej; }
 copier_marks_run() { touch .copier-ran; }
 copier_fails() { return 1; }
+# What copier did in CI on 2026-10-29: asked for a release, it recorded a moving tag instead.
+copier_records_canary() { sed -i 's/^_commit: .*/_commit: canary/' .copier-answers.yml; }
 
 TSYNC_TAGS="$(printf '%s\n' \
   $'aaa111\trefs/tags/v1' $'aaa111\trefs/tags/canary' $'aaa111\trefs/tags/v1.14.1' \
@@ -1094,6 +1096,25 @@ check 'files copier left conflict markers in are reported by name' \
 check 'a .rej file copier left is reported as a conflict' \
   'conflicts v1.7.0 -> v1.14.1: ci.yml.rej' \
   "$(tsync_with copier_rejects v1.14.1 "$(tsync_fixture rejected v1.7.0 'ci.yml:on: push')")"
+
+check 'a release is pinned over the moving tag copier recorded' \
+  '_commit: v1.15.0' \
+  "$(root="$(tsync_fixture pin v1)" &&
+     pin_template_commit "$root/.copier-answers.yml" v1.15.0 && grep '^_commit' "$root/.copier-answers.yml")"
+
+check 'a ref that is not a release, like HEAD, is left as copier recorded it' \
+  '_commit: v1.14.1-1-gec08a5d' \
+  "$(root="$(tsync_fixture head v1.14.1-1-gec08a5d)" &&
+     pin_template_commit "$root/.copier-answers.yml" HEAD && grep '^_commit' "$root/.copier-answers.yml")"
+
+# Regression: a render asked for v1.14.1 recorded `v1` in CI, because `git describe` took the
+# first of the tags on that commit. Recorded as-is, the next sync updates from a moving tag to
+# itself and applies nothing, which is how the monthly sweep stayed broken until 2026-09-11.
+check 'a sync records the release it was asked for, not the moving tag copier wrote' \
+  'updated v1.7.0 -> v1.15.0|_commit: v1.15.0' \
+  "$(root="$(tsync_fixture records v1.7.0 'README.md:v1')" &&
+     printf '%s|%s' "$(tsync_with copier_records_canary v1.15.0 "$root")" \
+       "$(grep '^_commit' "$root/.copier-answers.yml")")"
 
 check 'a copier failure fails the sync instead of passing for current' \
   'rejected' \

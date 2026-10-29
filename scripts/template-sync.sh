@@ -76,6 +76,7 @@ template_sync_main() {
   fi
   (cd "$root" && template_sync_copier update --defaults --vcs-ref "$ref" --conflict inline) >&2 \
     || return 1
+  pin_template_commit "$root/.copier-answers.yml" "$ref"
   local conflicts
   conflicts="$(template_sync_conflicts "$root")"
   if [ -n "$conflicts" ]; then
@@ -87,5 +88,7 @@ template_sync_main() {
 }
 
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+  # shellcheck source=scripts/lib.sh
+  . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
   template_sync_main "$@"
 fi

@@ -89,6 +89,10 @@ else
   fi
   copier copy --defaults "${REF_ARGS[@]}" --data-file "$DATA_FILE" "$PLATFORM_SRC" "$NAME" \
     || fail 'copier generation failed' 'check the template answers above'
+  # copier may record `v1` or `canary` here, which point at the same commit (lib.sh says why).
+  if [ -n "$TEMPLATE_REF" ]; then
+    pin_template_commit "$NAME/.copier-answers.yml" "$TEMPLATE_REF"
+  fi
   ok "generated ./$NAME from $TEMPLATE${TEMPLATE_REF:+ at $TEMPLATE_REF}"
 fi
 
