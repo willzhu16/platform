@@ -251,8 +251,12 @@ jobs:
           fi
           printf '%s\n' "template: $TEMPLATE" 'project_name: sync-check' \
             'description: selftest template sync' 'visibility: public' > "$RUNNER_TEMP/answers.yml"
+          # copier copies a local source's uncommitted state along with it, and `synced` below
+          # would be part of that state, as a nested repo it then fails to treat as a submodule.
+          # A clean clone of this commit is the source instead; real repos use gh:, unaffected.
+          git clone -q "$GITHUB_WORKSPACE" "$RUNNER_TEMP/platform-src"
           uvx --from copier copier copy --quiet --defaults --vcs-ref "$previous" \
-            --data-file "$RUNNER_TEMP/answers.yml" "$GITHUB_WORKSPACE" synced
+            --data-file "$RUNNER_TEMP/answers.yml" "$RUNNER_TEMP/platform-src" synced
           git -C synced init -q
           git -C synced add -A
           git -C synced -c user.name=selftest -c user.email=selftest@invalid commit -qm render
