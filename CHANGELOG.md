@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.14.1](https://github.com/willzhu16/platform/compare/v1.14.0...v1.14.1) (2026-10-29)
+
+
+### Bug Fixes
+
+* **security:** run semgrep on Python 3.13 again ([#95](https://github.com/willzhu16/platform/issues/95)) ([ad42740](https://github.com/willzhu16/platform/commit/ad42740e98e43aa60a066ee4c9044eefa5e0061b))
+
 ## [1.14.0](https://github.com/willzhu16/platform/compare/v1.13.1...v1.14.0) (2026-10-28)
 
 
