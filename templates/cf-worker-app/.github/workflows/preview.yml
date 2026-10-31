@@ -20,3 +20,7 @@ jobs:
     # Draft PRs skip the deploy; nobody visits a preview URL for a draft.
     if: ${{ github.event.pull_request.draft == false }}
     uses: willzhu16/platform/.github/workflows/preview.yml@v1
+    # The value comes from this repo's `preview` environment, but GitHub hands a reusable
+    # workflow only the secrets its caller names, so name it here.
+    secrets:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
