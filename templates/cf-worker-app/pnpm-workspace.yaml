@@ -4,3 +4,12 @@ allowBuilds:
   esbuild: true
   workerd: true
   sharp: true
+
+# qs below 6.16.1 carries four advisories (GHSA-4mjr-xmp4-gh2g, GHSA-6pq8-jhm2-2vcw,
+# GHSA-q8mj-m7cp-5q26, GHSA-x5fp-wj9c-mxmx) and reaches a project through
+# @stryker-mutator/core -> typed-rest-client 2.3.1, which pins 6.15.1 exactly, so no lockfile
+# refresh can lift it and a new project's `security / osv` would start red. athena overrides
+# it the same way. Pinned rather than a range: a range takes the newest qs, which can be
+# younger than the three-day wait for new releases. Drop this once Stryker stops pulling the pin.
+overrides:
+  qs: 6.16.1
