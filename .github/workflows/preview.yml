@@ -12,8 +12,11 @@ name: preview-reusable
 # ignore red. A failed preview shows on the PR but does not block the merge. To change
 # that, add `preview / deploy` to the ruleset in every deploying repo.
 #
-# Secrets: the job runs in the CALLER's `preview` environment, which supplies
-# CLOUDFLARE_API_TOKEN. Callers do not need to forward repository secrets.
+# Secrets: callers pass CLOUDFLARE_API_TOKEN by name, and the job runs in the CALLER's
+# `preview` environment, whose secret of that name is the value it receives. Both halves are
+# needed: GitHub shows a reusable workflow only the secrets its caller passes, environment
+# secrets included. Until 2026-10-31 this said the environment alone was enough, the
+# template's caller passed nothing, and its previews deployed with an empty token.
 #
 # Caveat: `versions upload` needs the Worker to exist — the first production deploy
 # (or a manual `wrangler deploy`) creates it; preview runs before that fail.
@@ -27,6 +30,11 @@ on:
       node-version:
         type: string
         default: '24'
+    secrets:
+      CLOUDFLARE_API_TOKEN:
+        # Optional: a caller usually has no repository secret of this name, so what it passes
+        # is empty, and the `preview` environment's value takes precedence in the job below.
+        required: false
 
 permissions:
   contents: read
