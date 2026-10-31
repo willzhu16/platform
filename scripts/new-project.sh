@@ -73,12 +73,13 @@ else
   build_answers_file > "$DATA_FILE" # scripts/lib.sh — tested by scripts/tests.sh
   # Pin a concrete release, never the moving `v1`. copier writes whatever ref it used into
   # .copier-answers.yml as `_commit`, and a `_commit` that keeps moving makes a later
-  # `copier update` diff the template against itself, so the monthly sweep silently
-  # applies nothing. Skipped when PLATFORM_SRC is overridden (a local path, for testing).
+  # `copier update` diff the template against itself, so the template sync silently
+  # applies nothing. The release is the one `v1` points at, not the newest (lib.sh says
+  # why). Skipped when PLATFORM_SRC is overridden (a local path, for testing).
   TEMPLATE_REF=''
   if [ "$PLATFORM_SRC" = "gh:${PLATFORM_REPO}" ]; then
-    TEMPLATE_REF="$(gh api "repos/${PLATFORM_REPO}/tags" --paginate --jq '.[].name' 2>/dev/null \
-      | newest_release_tag)"
+    TEMPLATE_REF="$(gh api "repos/${PLATFORM_REPO}/git/matching-refs/tags/v" --paginate \
+      --jq '.[] | "\(.object.sha)\t\(.ref)"' 2>/dev/null | moving_tag_release v1)"
   fi
   REF_ARGS=()
   if [ -n "$TEMPLATE_REF" ]; then

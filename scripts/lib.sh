@@ -43,6 +43,20 @@ release_tag_at() { # $1=commit sha
     newest_release_tag
 }
 
+# Print the release the moving tag $1 points at, reading the same ref listing on stdin, or
+# nothing. A new project renders this rather than the newest release: its workflows run at
+# `v1`, which follows a release only once the canary passes, up to a day later, and a template
+# newer than its workflows can pass them inputs or secrets they do not declare yet. An
+# annotated tag's peeled `^{}` line comes after it, so the last match is the commit.
+moving_tag_release() { # $1=moving tag, e.g. v1
+  local refs sha
+  refs="$(cat)"
+  sha="$(awk -v ref="refs/tags/$1" '$2 == ref || $2 == ref "^{}" { sha = $1 } END { print sha }' \
+    <<<"$refs")"
+  [ -n "$sha" ] || return 0
+  release_tag_at "$sha" <<<"$refs"
+}
+
 # Record release $2 as the template version in copier answers file $1, whatever copier wrote.
 # copier fills `_commit` from `git describe --tags`, which takes the first name in sort order
 # when several tags point at one commit, and at a release commit that is `canary` or `v1`: on

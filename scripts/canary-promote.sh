@@ -5,9 +5,9 @@
 #
 # A release used to move `v1` the moment it was cut, so every repo in the fleet ran it on its
 # next CI run and nothing real had run it first: 1.13.1 broke `security / semgrep` everywhere
-# that way. Releases now move `canary` instead. While canary and v1 differ, canary-worker's
-# canary.yml runs each reusable workflow twice an hour, once at @v1 (jobs named stable-*) and
-# once at @canary (canary-*). This reads the newest completed run that started after the
+# that way. Releases now move `canary` instead. While canary and v1 differ, each run of
+# canary-worker's hourly canary.yml runs each reusable workflow twice, once at @v1 (jobs named
+# stable-*) and once at @canary (canary-*). This reads the newest completed run that started after the
 # release and moves v1 only when no job passes on v1 and fails on canary.
 #
 # Comparing the two is the point. canary-worker sometimes fails a check for its own reasons
@@ -25,7 +25,10 @@
 
 set -uo pipefail
 
-CANARY_MAX_WAIT_SECONDS=21600
+# A day, not the six hours this started at. GitHub fires an hourly schedule hours apart: the
+# first nine runs of promote-canary.yml, in October 2026, came 3.5 to 6.8 hours apart. Six
+# hours would have failed ordinary releases; a day still catches a disabled canary.yml.
+CANARY_MAX_WAIT_SECONDS=86400
 # A run counts only if it started this long after the release, so it cannot have resolved
 # @canary in the seconds before the release workflow moved the tag.
 CANARY_SETTLE_SECONDS=300

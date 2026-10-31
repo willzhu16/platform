@@ -1113,6 +1113,26 @@ check 'a commit no release tag points at gives nothing' \
   '' \
   "$(release_tag_at eee555 <<<"$TSYNC_TAGS")"
 
+# A release waits on the canary for up to a day before v1 follows it. A new project's workflows
+# run at v1, so it renders the release v1 points at; the newest release could hand it callers
+# for inputs or secrets v1 does not have yet.
+V1_BEHIND="$(printf '%s\n' $'aaa111\trefs/tags/v1' $'aaa111\trefs/tags/v1.14.1' \
+  $'ccc333\trefs/tags/v1.15.0' $'ccc333\trefs/tags/canary')"
+
+check 'a new project renders the release v1 points at, not the newest one' \
+  'v1.14.1' \
+  "$(moving_tag_release v1 <<<"$V1_BEHIND")"
+
+check 'an annotated v1 is followed through its peeled commit' \
+  'v1.14.1' \
+  "$(printf '%s\n' $'ttt999\trefs/tags/v1' $'aaa111\trefs/tags/v1^{}' $'aaa111\trefs/tags/v1.14.1' |
+     moving_tag_release v1)"
+
+check 'with no v1 tag there is no release to render, and no failure under pipefail' \
+  'REACHED:' \
+  "$(set -euo pipefail; t="$(printf '%s\n' $'ccc333\trefs/tags/v1.15.0' | moving_tag_release v1)"
+     printf 'REACHED:%s' "$t")"
+
 check 'the recorded template version is read with or without quotes' \
   'v1.7.0' \
   "$(root="$(tsync_fixture quoted v1.0.0)" &&
@@ -1277,11 +1297,18 @@ check 'a release whose canary run has not happened yet waits quietly' \
   'waiting: no completed canary run of v1.15.0 yet' \
   "$(canary_with_gh ccc333 '' "$CANARY_CLEAN" "$((CANARY_PUBLISHED + 3600))")"
 
+# Regression: the limit was six hours, but GitHub fires an hourly schedule hours apart. The
+# first nine runs of promote-canary.yml, in October 2026, came 3.5 to 6.8 hours apart, so an
+# ordinary release would have turned the promotion red with nothing wrong.
+check 'a release seven hours old with no canary run still waits, since schedules run late' \
+  'waiting: no completed canary run of v1.15.0 yet' \
+  "$(canary_with_gh ccc333 '' "$CANARY_CLEAN" "$((CANARY_PUBLISHED + 7 * 3600))")"
+
 # Without this, a disabled canary.yml would leave v1 stuck on the old release with every
 # promote run green, which reads exactly like "nothing to do".
-check 'a release that has waited six hours with no canary run fails the promotion' \
-  'v1.15.0 has waited over 6 hours with no canary run; check canary.yml in o/canary-worker' \
-  "$(canary_with_gh ccc333 '' "$CANARY_CLEAN" "$((CANARY_PUBLISHED + 7 * 3600))")"
+check 'a release that has waited a day with no canary run fails the promotion' \
+  'v1.15.0 has waited over 24 hours with no canary run; check canary.yml in o/canary-worker' \
+  "$(canary_with_gh ccc333 '' "$CANARY_CLEAN" "$((CANARY_PUBLISHED + 25 * 3600))")"
 
 check 'a failed read of the canary runs fails loudly instead of passing for not run yet' \
   'could not read canary runs from o/canary-worker' \
