@@ -1073,6 +1073,26 @@ check 'a commit no release tag points at gives nothing' \
   '' \
   "$(release_tag_at eee555 <<<"$TSYNC_TAGS")"
 
+# A release waits on the canary for up to a day before v1 follows it. A new project's workflows
+# run at v1, so it renders the release v1 points at; the newest release could hand it callers
+# for inputs or secrets v1 does not have yet.
+V1_BEHIND="$(printf '%s\n' $'aaa111\trefs/tags/v1' $'aaa111\trefs/tags/v1.14.1' \
+  $'ccc333\trefs/tags/v1.15.0' $'ccc333\trefs/tags/canary')"
+
+check 'a new project renders the release v1 points at, not the newest one' \
+  'v1.14.1' \
+  "$(moving_tag_release v1 <<<"$V1_BEHIND")"
+
+check 'an annotated v1 is followed through its peeled commit' \
+  'v1.14.1' \
+  "$(printf '%s\n' $'ttt999\trefs/tags/v1' $'aaa111\trefs/tags/v1^{}' $'aaa111\trefs/tags/v1.14.1' |
+     moving_tag_release v1)"
+
+check 'with no v1 tag there is no release to render, and no failure under pipefail' \
+  'REACHED:' \
+  "$(set -euo pipefail; t="$(printf '%s\n' $'ccc333\trefs/tags/v1.15.0' | moving_tag_release v1)"
+     printf 'REACHED:%s' "$t")"
+
 check 'the recorded template version is read with or without quotes' \
   'v1.7.0' \
   "$(root="$(tsync_fixture quoted v1.0.0)" &&
