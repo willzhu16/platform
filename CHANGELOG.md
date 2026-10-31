@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.15.1](https://github.com/willzhu16/platform/compare/v1.15.0...v1.15.1) (2026-10-31)
+
+
+### Bug Fixes
+
+* **release:** wait a day for the canary; new projects follow v1 ([#102](https://github.com/willzhu16/platform/issues/102)) ([52791e7](https://github.com/willzhu16/platform/commit/52791e7aa7ca9dcdcc3b270fddf7e379ea5faaf7))
+* **templates:** pass deploy token by name, bump Stryker ([#101](https://github.com/willzhu16/platform/issues/101)) ([8bb92ee](https://github.com/willzhu16/platform/commit/8bb92eef5d915f3bae0c5db5eeeb11d339864148))
+
 ## [1.15.0](https://github.com/willzhu16/platform/compare/v1.14.1...v1.15.0) (2026-10-29)
 
 
