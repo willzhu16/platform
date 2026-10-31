@@ -19,9 +19,10 @@ name: release-reusable
 # and release-please's GITHUB_TOKEN tags never fire `push: tags` on their own, so the
 # template's release-please.yml dispatches this workflow the same way.
 #
-# Secrets: the deploy job runs in the CALLER's `production` environment,
-# which supplies CLOUDFLARE_API_TOKEN. Callers do not need to forward
-# repository secrets to the build or deploy jobs.
+# Secrets: deploying callers pass CLOUDFLARE_API_TOKEN by name, and the deploy job runs in
+# the CALLER's `production` environment, whose secret of that name is the value it receives.
+# Both halves are needed, as in preview.yml: GitHub shows a reusable workflow only the secrets
+# its caller passes, environment secrets included. The build job needs no secret.
 #
 # The `publish` extension point (npm/Marketplace, spec 09's SBOM/signing) is the
 # no-op `publish-command` input — it runs in the build job after the artifact upload.
@@ -56,6 +57,12 @@ on:
       python-version:
         type: string
         default: '3.13'
+    secrets:
+      CLOUDFLARE_API_TOKEN:
+        # Optional, as in preview.yml: what the caller passes is usually empty, and the
+        # `production` environment's value takes precedence in the deploy job. Callers that
+        # do not deploy pass nothing.
+        required: false
 
 permissions:
   contents: write # attach artifacts to the GitHub Release

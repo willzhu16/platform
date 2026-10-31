@@ -180,6 +180,46 @@ print(','.join(failures))
 PY
 )"
 
+# Regression: preview.yml and release.yml read CLOUDFLARE_API_TOKEN without declaring it, so
+# the only way a caller could hand it over was `secrets: inherit`, which the check above
+# forbids in templates. The template passed nothing, and its previews deployed with an empty
+# token. GitHub shows a reusable workflow only what its caller passes, environment or not.
+check 'every secret a reusable workflow reads is one it declares' \
+  '' \
+  "$(python3 - "$PLATFORM_ROOT" <<'PY' 2>/dev/null
+import pathlib, re, sys, yaml
+failures = []
+for path in sorted(pathlib.Path(sys.argv[1], '.github/workflows').glob('*.yml')):
+    text = path.read_text()
+    document = yaml.safe_load(text) or {}
+    triggers = document.get('on', document.get(True))
+    if not (isinstance(triggers, dict) and 'workflow_call' in triggers):
+        continue
+    declared = set(((triggers['workflow_call'] or {}).get('secrets') or {}).keys())
+    read = set(re.findall(r'secrets\.([A-Za-z_][A-Za-z0-9_]*)', text)) - {'GITHUB_TOKEN'}
+    failures += [f'{path.name}:{name}' for name in sorted(read - declared)]
+print(','.join(failures))
+PY
+)"
+
+check 'template jobs that deploy pass CLOUDFLARE_API_TOKEN by name' \
+  '' \
+  "$(python3 - "$PLATFORM_ROOT" <<'PY' 2>/dev/null
+import pathlib, sys, yaml
+root = pathlib.Path(sys.argv[1])
+failures = []
+for path in sorted((root / 'templates').glob('*/.github/workflows/*')):
+    document = yaml.safe_load(path.read_text()) or {}
+    for name, job in (document.get('jobs') or {}).items():
+        uses = job.get('uses', '')
+        deploys = '/preview.yml@' in uses or (
+            '/release.yml@' in uses and (job.get('with') or {}).get('deploy') is True)
+        if deploys and 'CLOUDFLARE_API_TOKEN' not in (job.get('secrets') or {}):
+            failures.append(f'{path.relative_to(root)}:{name}')
+print(','.join(failures))
+PY
+)"
+
 check 'third-party Actions are pinned and data inputs stay out of shell source' \
   '' \
   "$(python3 - "$PLATFORM_ROOT" <<'PY' 2>/dev/null
