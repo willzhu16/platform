@@ -1237,11 +1237,18 @@ check 'a release whose canary run has not happened yet waits quietly' \
   'waiting: no completed canary run of v1.15.0 yet' \
   "$(canary_with_gh ccc333 '' "$CANARY_CLEAN" "$((CANARY_PUBLISHED + 3600))")"
 
+# Regression: the limit was six hours, but GitHub fires an hourly schedule hours apart. The
+# first nine runs of promote-canary.yml, in October 2026, came 3.5 to 6.8 hours apart, so an
+# ordinary release would have turned the promotion red with nothing wrong.
+check 'a release seven hours old with no canary run still waits, since schedules run late' \
+  'waiting: no completed canary run of v1.15.0 yet' \
+  "$(canary_with_gh ccc333 '' "$CANARY_CLEAN" "$((CANARY_PUBLISHED + 7 * 3600))")"
+
 # Without this, a disabled canary.yml would leave v1 stuck on the old release with every
 # promote run green, which reads exactly like "nothing to do".
-check 'a release that has waited six hours with no canary run fails the promotion' \
-  'v1.15.0 has waited over 6 hours with no canary run; check canary.yml in o/canary-worker' \
-  "$(canary_with_gh ccc333 '' "$CANARY_CLEAN" "$((CANARY_PUBLISHED + 7 * 3600))")"
+check 'a release that has waited a day with no canary run fails the promotion' \
+  'v1.15.0 has waited over 24 hours with no canary run; check canary.yml in o/canary-worker' \
+  "$(canary_with_gh ccc333 '' "$CANARY_CLEAN" "$((CANARY_PUBLISHED + 25 * 3600))")"
 
 check 'a failed read of the canary runs fails loudly instead of passing for not run yet' \
   'could not read canary runs from o/canary-worker' \

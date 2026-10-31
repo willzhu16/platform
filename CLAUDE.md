@@ -34,7 +34,8 @@ service to run; the deploy target is GitHub itself.
     actionlint + shellcheck +
     runs ci/ci-python against the fixtures + copier-renders both templates and runs their
     gates), `release-platform.yml` (release-please; then moves the `canary` tag, NOT `v1`),
-    `promote-canary.yml` (hourly: moves `v1` onto the canary release once canary-worker's
+    `promote-canary.yml` (hourly in name; GitHub fires it 3.5 to 6.8 hours apart, so allow
+    most of a day: moves `v1` onto the canary release once canary-worker's
     `canary.yml` run shows nothing passing at `@v1` fails at `@canary`; rule and tests in
     `scripts/canary-promote.sh`), `update-major-tag.yml` (force-moves `v1` onto a given
     `vX.Y.Z`; dispatch only, regex-guarded; dispatching it by hand is the urgent-fix and

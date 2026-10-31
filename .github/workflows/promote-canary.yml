@@ -4,10 +4,11 @@ name: promote-canary
 # release; this moves `v1`, the tag every repo pins, only after canary-worker has run the
 # release and nothing that passes on v1 failed on it (scripts/canary-promote.sh has the rule).
 # Runs half an hour after canary-worker's hourly canary.yml, reads only public data, and
-# dispatches update-major-tag.yml as its one write.
+# dispatches update-major-tag.yml as its one write. GitHub fires both schedules hours apart
+# (3.5 to 6.8 hours between runs in October 2026), so v1 can take most of a day to follow.
 #
 # Red here means v1 is being held: either the canary run found a regression (the log names
-# the job), or no canary run has happened for hours. Fix forward with another release, or
+# the job), or no canary run has happened for a day. Fix forward with another release, or
 # move v1 by hand: gh workflow run update-major-tag.yml -f tag=vX.Y.Z
 
 on:
