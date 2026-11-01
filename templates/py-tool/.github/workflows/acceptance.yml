@@ -15,8 +15,12 @@ name: acceptance
 on:
   pull_request:
 
+# The reusable job reads this PR and the issue it closes, and a called workflow gets no more
+# than its caller grants: without the two reads GitHub refuses to start it at all.
 permissions:
   contents: read
+  issues: read
+  pull-requests: read
 
 jobs:
   acceptance: # job id MUST be `acceptance` — check-name contract
