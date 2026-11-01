@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.15.2](https://github.com/willzhu16/platform/compare/v1.15.1...v1.15.2) (2026-11-01)
+
+
+### Bug Fixes
+
+* **templates:** grant the acceptance gate the reads it needs ([#106](https://github.com/willzhu16/platform/issues/106)) ([51000c7](https://github.com/willzhu16/platform/commit/51000c764441415050a746a085015c66153a064b))
+* **templates:** override minimatch so new projects pass osv ([#104](https://github.com/willzhu16/platform/issues/104)) ([bfa74dd](https://github.com/willzhu16/platform/commit/bfa74ddd184e4a062fd66931480c89ed8ea988bd))
+
 ## [1.15.1](https://github.com/willzhu16/platform/compare/v1.15.0...v1.15.1) (2026-10-31)
 
 
