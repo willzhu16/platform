@@ -220,6 +220,39 @@ print(','.join(failures))
 PY
 )"
 
+# Regression: acceptance.yml's job reads the PR and its linked issue, but the template callers
+# granted only `contents: read`. A called workflow gets no more than its caller grants, so
+# GitHub refused to start it (startup_failure) and no `acceptance` check ever appeared.
+check 'template callers grant every permission a reusable job requests' \
+  '' \
+  "$(python3 - "$PLATFORM_ROOT" <<'PY' 2>/dev/null
+import pathlib, re, sys, yaml
+root = pathlib.Path(sys.argv[1])
+levels = {'none': 0, 'read': 1, 'write': 2}
+
+def granted(permissions):
+    if permissions in ('read-all', 'write-all'):
+        return lambda scope: levels[permissions[:-4]]
+    table = permissions or {}
+    return lambda scope: levels[table.get(scope, 'none')]
+
+failures = []
+for path in sorted((root / 'templates').glob('*/.github/workflows/*')):
+    document = yaml.safe_load(path.read_text()) or {}
+    for name, job in (document.get('jobs') or {}).items():
+        called = re.match(r'willzhu16/platform/\.github/workflows/([^@]+)@', job.get('uses', ''))
+        if not called:
+            continue
+        caller = granted(job.get('permissions', document.get('permissions')))
+        reusable = yaml.safe_load((root / '.github/workflows' / called[1]).read_text()) or {}
+        for inner in (reusable.get('jobs') or {}).values():
+            for scope, level in (inner.get('permissions', reusable.get('permissions')) or {}).items():
+                if levels[level] > caller(scope):
+                    failures.append(f'{path.relative_to(root)}:{name}:{scope}')
+print(','.join(sorted(set(failures))))
+PY
+)"
+
 check 'third-party Actions are pinned and data inputs stay out of shell source' \
   '' \
   "$(python3 - "$PLATFORM_ROOT" <<'PY' 2>/dev/null
