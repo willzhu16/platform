@@ -1,5 +1,3 @@
-# pnpm reads build-script approvals here. These are wrangler's own toolchain deps
-# (bundler, runtime, image lib) and need their install scripts to run.
 allowBuilds:
   esbuild: true
   workerd: true
@@ -12,7 +10,7 @@ allowBuilds:
 # it the same way. Pinned rather than a range: a range takes the newest qs, which can be
 # younger than the three-day wait for new releases. Drop this once Stryker stops pulling the pin.
 overrides:
-  qs: 6.16.1
+  qs: 6.17.1
   # minimatch below 11.0.1 carries GHSA-g3hv-75wg-m249 (glob DoS) and reaches a project through
   # @stryker-mutator/core 10.1.1, which asks for ~10.2.4; no 10.x release has the fix. Stryker
   # calls only Minimatch#match, #negate, #hasMagic and minimatch(), none of which 11.0 removed.
