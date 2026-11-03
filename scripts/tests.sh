@@ -1044,7 +1044,8 @@ check 'the gate exits non-zero on a finding, since the exit code is the gate' \
      bash "$SCRIPT_DIR/osv-coverage.sh" "$TMP/osv-exit.json" "$root" /scan >/dev/null 2>&1 &&
      echo accepted || echo rejected)"
 
-# selftest's copy of the scan is only a guard for security.yml's while the two are identical.
+# selftest's copies of the scan (the coverage guard and the render scans) are only a guard for
+# security.yml's while they run the same scanner the same way; only the directory differs.
 check 'selftest runs the coverage scan with the same scanner pin and arguments as security.yml' \
   'same' \
   "$(python3 - "$PLATFORM_ROOT/.github/workflows" <<'PY' 2>/dev/null
@@ -1052,7 +1053,7 @@ import pathlib, sys, yaml
 root = pathlib.Path(sys.argv[1])
 def scans(name):
     jobs = yaml.safe_load((root / name).read_text())["jobs"]
-    return {(step["uses"], step["with"]["scan-args"])
+    return {(step["uses"], step["with"]["scan-args"].rsplit("\n", 1)[0])
             for job in jobs.values() for step in job.get("steps", [])
             if step.get("uses", "").startswith("google/osv-scanner-action/")
             and "--all-packages" in step.get("with", {}).get("scan-args", "")}
@@ -1079,6 +1080,24 @@ def setup(name, job_id):
 security = setup("security.yml", "semgrep")
 selftest = setup("selftest.yml", "test-semgrep-rules")
 print("same" if security[0] and security[1] and security == selftest else f"{security} != {selftest}")
+PY
+)"
+
+# Regression: selftest rendered the templates and ran their gates but never scanned a render
+# with osv, so the minimatch advisory of 2026-10-30 shipped in 1.15.1 and every project
+# rendered from it started red on `security / osv`.
+check 'each full template render is scanned with osv' \
+  'render-cf-worker-app=yes render-py-tool=yes' \
+  "$(python3 - "$PLATFORM_ROOT/.github/workflows/selftest.yml" <<'PY' 2>/dev/null
+import sys, yaml
+jobs = yaml.safe_load(open(sys.argv[1]))['jobs']
+found = []
+for name in ('render-cf-worker-app', 'render-py-tool'):
+    scans = [step for step in jobs[name]['steps']
+             if 'osv-scanner-action' in step.get('uses', '') and not step.get('continue-on-error')
+             and 'render-out' in (step.get('with') or {}).get('scan-args', '')]
+    found.append(f"{name}={'yes' if scans else 'no'}")
+print(' '.join(found))
 PY
 )"
 

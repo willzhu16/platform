@@ -347,6 +347,32 @@ jobs:
           pnpm test
           pnpm run test:mutation
           pnpm build
+      # A new project's first `security / osv` scans the lockfile its first install writes, so
+      # scan this one. Until 2026-11-03 nothing here did, and a minimatch advisory shipped in
+      # 1.15.1 that way: every project rendered from it started red. Same scanner pin and
+      # coverage check as security.yml; the coverage check lists lockfiles with git, so the
+      # render becomes a repo first.
+      - name: Make the render a repo for the osv coverage check
+        run: git -C render-out init -q && git -C render-out add -A
+      - name: List every package osv-scanner reads in the render
+        # Exits 1 on any advisory; the scan below is the step that reports those.
+        continue-on-error: true
+        uses: google/osv-scanner-action/osv-scanner-action@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
+        with:
+          scan-args: |-
+            --format=json
+            --all-packages
+            --output-file=.artemis-osv-packages.json
+            --recursive
+            ./render-out
+      - name: Verify osv-scanner read the render's lockfile
+        run: bash scripts/osv-coverage.sh .artemis-osv-packages.json render-out /github/workspace/render-out
+      - name: Scan the render with osv
+        uses: google/osv-scanner-action/osv-scanner-action@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
+        with:
+          scan-args: |-
+            --recursive
+            ./render-out
       - name: Assert the Workers fitness rules reject a violation
         working-directory: render-out
         # `pnpm lint` passing above only proves the config parses, because the template's
@@ -470,6 +496,28 @@ jobs:
           # enforce it here.
           uv run pytest --cov
           uv run python scripts/mutation.py
+      # Scanned like the cf-worker-app render above, for the same reason.
+      - name: Make the render a repo for the osv coverage check
+        run: git -C render-out init -q && git -C render-out add -A
+      - name: List every package osv-scanner reads in the render
+        # Exits 1 on any advisory; the scan below is the step that reports those.
+        continue-on-error: true
+        uses: google/osv-scanner-action/osv-scanner-action@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
+        with:
+          scan-args: |-
+            --format=json
+            --all-packages
+            --output-file=.artemis-osv-packages.json
+            --recursive
+            ./render-out
+      - name: Verify osv-scanner read the render's lockfile
+        run: bash scripts/osv-coverage.sh .artemis-osv-packages.json render-out /github/workspace/render-out
+      - name: Scan the render with osv
+        uses: google/osv-scanner-action/osv-scanner-action@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
+        with:
+          scan-args: |-
+            --recursive
+            ./render-out
       - name: Assert the Python fitness rules reject a violation
         working-directory: render-out
         # `ruff check` passing above only proves the config parses, because the template's own
