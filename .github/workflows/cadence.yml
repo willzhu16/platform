@@ -1,16 +1,18 @@
 name: cadence
 
-# Opens the recurring-maintenance issues from handbook/cadences.md on schedule (spec 05
-# §2.5) — each issue body IS its checklist, so the ritual is unskippable rather than
-# remembered. One cron per cadence; GitHub fires a separate event per matching cron, so
-# a date that is both "Monday" and "the 1st" correctly opens both issues.
+# Opens the recurring-maintenance issues on schedule (spec 05 §2.5). Each issue body is its
+# checklist, read from handbook/cadences.md when the run starts, so editing the handbook is
+# the whole change: until 2026-11-03 this file kept its own copy, and the two had drifted.
+# Opening an issue closes the previous open one of the same cadence, since an unworked
+# checklist only hides the next. One cron per cadence; GitHub fires a separate event per
+# matching cron, so the 1st of a quarter opens both the monthly and the quarterly issue.
 #
 # Test without waiting for a cron: Actions → cadence → Run workflow → pick a cadence
 # (acceptance test 2). Re-running the same period is a no-op (it dedupes on title).
 
 on:
   schedule:
-    - cron: '0 6 * * 1'          # weekly    — Mondays 06:00 UTC
+    - cron: '0 6 * * 1'          # weekly    — Mondays 06:00 UTC, fleet-audit only
     - cron: '0 6 1 * *'          # monthly   — the 1st, 06:00 UTC
     - cron: '0 6 1 1,4,7,10 *'   # quarterly — 1st of Jan/Apr/Jul/Oct, 06:00 UTC
   workflow_dispatch:
@@ -18,8 +20,8 @@ on:
       cadence:
         description: Which cadence issue to open (manual test)
         type: choice
-        options: [weekly, monthly, quarterly]
-        default: weekly
+        options: [monthly, quarterly]
+        default: monthly
 
 permissions:
   contents: read
@@ -27,77 +29,73 @@ permissions:
 
 jobs:
   open-issue:
+    # The weekly cron is kept for fleet-audit below; no weekly checklist is left.
+    if: github.event.schedule != '0 6 * * 1'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Open the cadence issue
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          sparse-checkout: |
+            handbook/cadences.md
+            scripts/lib.sh
+          sparse-checkout-cone-mode: false
+      - name: Read the checklist from the handbook
+        env:
+          SCHEDULE: ${{ github.event.schedule }}
+          CHOSEN: ${{ inputs.cadence }}
+        run: |
+          case "$SCHEDULE" in
+            '0 6 1 * *') cadence=monthly ;;
+            '0 6 1 1,4,7,10 *') cadence=quarterly ;;
+            '') cadence="$CHOSEN" ;;
+            *) echo "::error::unrecognized schedule: $SCHEDULE"; exit 1 ;;
+          esac
+          # shellcheck source=/dev/null
+          . scripts/lib.sh
+          cadence_checklist "$cadence" <handbook/cadences.md >"$RUNNER_TEMP/checklist.md"
+          if [ ! -s "$RUNNER_TEMP/checklist.md" ]; then
+            echo "::error::handbook/cadences.md has no checklist under a '$cadence' heading"
+            exit 1
+          fi
+          echo "CADENCE=$cadence" >>"$GITHUB_ENV"
+      - name: Open the cadence issue and close the one before it
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
-            const CRON_TO_CADENCE = {
-              '0 6 * * 1': 'weekly',
-              '0 6 1 * *': 'monthly',
-              '0 6 1 1,4,7,10 *': 'quarterly',
-            };
-            const cadence = context.eventName === 'workflow_dispatch'
-              ? context.payload.inputs.cadence
-              : CRON_TO_CADENCE[context.payload.schedule];
-            if (!cadence) {
-              core.setFailed(`unrecognized schedule: ${context.payload.schedule}`);
-              return;
-            }
-
-            // Mirror of handbook/cadences.md — that file is the canonical wording; any
-            // edit there must be copied here (and vice versa) until the checklist is
-            // parsed from the handbook at runtime.
-            const CHECKLISTS = {
-              weekly: [
-                'Review the **SEV3 digest** — anything recurring becomes a systemic fix (an issue).',
-                'Handle the **Renovate PRs still open**. The non-major batch and the lock file refresh ' +
-                  'merge themselves when green, so what is left is majors and anything that went red.',
-              ],
-              monthly: [
-                '**Template sync PRs** — `template-sync.yml` opens one in each repo weekly; ' +
-                  'resolve any that copier left with conflict markers.',
-                '**Semgrep rules + vendored actions review** — bump the vendored copies via PR.',
-                '**Expired osv-ignores** — grep for lapsed suppression dates; re-triage or remove.',
-                "**Session-log harvest** — read the month's agent session logs; convert recurring " +
-                  'mistakes into a lint/CI rule (preferred, deterministic) or an instruction line ' +
-                  '(fallback). This is the athena flywheel (ARCHITECTURE §6.0 rule 5) made a ritual.',
-              ],
-              quarterly: [
-                '**Token rotation + access review** — walk the spec 06 secrets inventory.',
-                '**Session & device review** — review active sessions / devices / OAuth apps ' +
-                  'on GitHub + Cloudflare; revoke anything unrecognized same-day (spec 12 §2.1).',
-                '**Restore test** — for each project with a D1 database, restore its latest ' +
-                  'export into a scratch database and run the smoke test against it ' +
-                  '(steps in platform `backups/README.md`). Skip only while no project has ' +
-                  'a database. An untested backup is a guess.',
-                '**Stale sweep** — remove feature flags past 100% rollout and stale branches.',
-              ],
-            };
-
+            const fs = require('fs');
+            const cadence = process.env.CADENCE;
+            const items = fs.readFileSync(`${process.env.RUNNER_TEMP}/checklist.md`, 'utf8').trim();
             const today = new Date().toISOString().slice(0, 10);
             const title = `Cadence: ${cadence} — ${today}`;
-            const body = [
-              `Recurring **${cadence}** maintenance (handbook/cadences.md). Check each item, then close.`,
-              '',
-              ...CHECKLISTS[cadence].map((item) => `- [ ] ${item}`),
-            ].join('\n');
-
             const { owner, repo } = context.repo;
-            const existing = await github.rest.issues.listForRepo({
-              owner, repo, state: 'open', labels: 'cadence', per_page: 100,
-            });
-            if (existing.data.some((issue) => issue.title === title)) {
+            const open = (await github.paginate(github.rest.issues.listForRepo, {
+              owner, repo, state: 'open', labels: `cadence,${cadence}`, per_page: 100,
+            })).filter((issue) => !issue.pull_request);
+            if (open.some((issue) => issue.title === title)) {
               core.info(`"${title}" already open — skipping (idempotent).`);
               return;
             }
 
+            const body = [
+              `Recurring **${cadence}** maintenance (handbook/cadences.md). Check each item, then close.`,
+              '',
+              items,
+            ].join('\n');
             const { data } = await github.rest.issues.create({
               owner, repo, title, body, labels: ['cadence', cadence],
             });
             core.info(`opened #${data.number}: ${title}`);
+
+            for (const issue of open) {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: issue.number, body: `Superseded by #${data.number}.`,
+              });
+              await github.rest.issues.update({
+                owner, repo, issue_number: issue.number, state: 'closed', state_reason: 'not_planned',
+              });
+              core.info(`closed #${issue.number}`);
+            }
 
   # Nothing else in Artemis looks across repos. athena-sync.yml is a reusable workflow that
   # each managed repo calls FOR ITSELF, so a project built without the harness is never
