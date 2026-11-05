@@ -55,6 +55,17 @@
         "digest"
       ],
       "groupName": "template non-major dependencies"
+    },
+    {
+      "description": "Lock file maintenance lists the template's pnpm-workspace.yaml among its package files, so the template rules above would make it a weekly fix that cuts a release. Keep it the chore it was, on the preset's Monday schedule.",
+      "matchUpdateTypes": [
+        "lockFileMaintenance"
+      ],
+      "semanticCommitType": "chore",
+      "semanticCommitScope": "deps",
+      "schedule": [
+        "before 06:00 on monday"
+      ]
     }
   ]
 }

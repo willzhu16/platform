@@ -253,6 +253,44 @@ print(','.join(sorted(set(failures))))
 PY
 )"
 
+# Regression: Renovate read no template package.json.jinja (its npm manager parses only files
+# named *json), so new projects started a major behind the fleet (vitest 4 while canary-worker
+# ran 5) and platform's render jobs tested the old versions. renovate.json reads the file with
+# a regex manager instead; this runs that manager's regexes the way Renovate does and fails for
+# any dependency the file lists that they miss.
+check 'Renovate extracts every dependency each template package.json.jinja lists' \
+  '' \
+  "$(python3 - "$PLATFORM_ROOT" <<'PY' 2>/dev/null
+import json, pathlib, re, sys
+root = pathlib.Path(sys.argv[1])
+
+def python_regex(pattern):
+    return re.compile(re.sub(r'\(\?<(?=[A-Za-z])', '(?P<', pattern.strip('/')))
+
+managers = json.loads((root / 'renovate.json').read_text()).get('customManagers', [])
+failures = []
+for path in sorted(root.glob('templates/*/package.json.jinja')):
+    relative, text = str(path.relative_to(root)), path.read_text()
+    try:
+        package = json.loads(text)
+    except ValueError:
+        failures.append(relative + ': not JSON, so the expected dependencies are unknown')
+        continue
+    expected = set(package.get('dependencies', {})) | set(package.get('devDependencies', {}))
+    found = set()
+    for manager in managers:
+        if not any(python_regex(p).search(relative) for p in manager.get('managerFilePatterns', [])):
+            continue
+        regions = [text]
+        for pattern in manager['matchStrings']:
+            matches = [m for region in regions for m in python_regex(pattern).finditer(region)]
+            regions = [m.group(0) for m in matches]
+        found |= {m.group('depName') for m in matches if 'depName' in m.groupdict()}
+    failures += [f'{relative}: {name} not extracted' for name in sorted(expected - found)]
+print(','.join(failures))
+PY
+)"
+
 check 'third-party Actions are pinned and data inputs stay out of shell source' \
   '' \
   "$(python3 - "$PLATFORM_ROOT" <<'PY' 2>/dev/null
@@ -1376,46 +1414,6 @@ triggers = doc.get("on", doc.get(True))
 callers = sorted(path.name for path in root.glob("*.yml")
                  if path.name != "update-major-tag.yml" and "update-major-tag.yml" in path.read_text())
 print(",".join(sorted(triggers)) + "|" + ",".join(callers))
-PY
-)"
-
-# --- template dependencies --------------------------------------------------------------
-
-# Regression: Renovate read no template package.json.jinja (its npm manager parses only files
-# named *json), so new projects started a major behind the fleet (vitest 4 while canary-worker
-# ran 5) and platform's render jobs tested the old versions. renovate.json reads the file with
-# a regex manager instead; this runs that manager's regexes the way Renovate does and fails for
-# any dependency the file lists that they miss.
-check 'Renovate extracts every dependency each template package.json.jinja lists' \
-  '' \
-  "$(python3 - "$PLATFORM_ROOT" <<'PY' 2>/dev/null
-import json, pathlib, re, sys
-root = pathlib.Path(sys.argv[1])
-
-def python_regex(pattern):
-    return re.compile(re.sub(r'\(\?<(?=[A-Za-z])', '(?P<', pattern.strip('/')))
-
-managers = json.loads((root / 'renovate.json').read_text()).get('customManagers', [])
-failures = []
-for path in sorted(root.glob('templates/*/package.json.jinja')):
-    relative, text = str(path.relative_to(root)), path.read_text()
-    try:
-        package = json.loads(text)
-    except ValueError:
-        failures.append(relative + ': not JSON, so the expected dependencies are unknown')
-        continue
-    expected = set(package.get('dependencies', {})) | set(package.get('devDependencies', {}))
-    found = set()
-    for manager in managers:
-        if not any(python_regex(p).search(relative) for p in manager.get('managerFilePatterns', [])):
-            continue
-        regions = [text]
-        for pattern in manager['matchStrings']:
-            matches = [m for region in regions for m in python_regex(pattern).finditer(region)]
-            regions = [m.group(0) for m in matches]
-        found |= {m.group('depName') for m in matches if 'depName' in m.groupdict()}
-    failures += [f'{relative}: {name} not extracted' for name in sorted(expected - found)]
-print(','.join(failures))
 PY
 )"
 
