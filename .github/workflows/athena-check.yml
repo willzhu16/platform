@@ -24,7 +24,7 @@ on:
         default: 'v1' # the moving athena major tag (D-18)
       node-version:
         type: string
-        default: '24'
+        default: '26'
 
 # Read-only, unlike athena-sync: this job reports, it never writes a branch or a PR.
 permissions:

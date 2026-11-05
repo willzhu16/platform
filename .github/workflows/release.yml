@@ -53,7 +53,7 @@ on:
         default: '.'
       node-version:
         type: string
-        default: '24'
+        default: '26'
       python-version:
         type: string
         default: '3.13'

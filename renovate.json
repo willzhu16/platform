@@ -29,6 +29,19 @@
       ],
       "datasourceTemplate": "npm",
       "versioningTemplate": "npm"
+    },
+    {
+      "description": "Read the node-version input default of each reusable workflow. Renovate's github-actions manager reads only setup-node's own node-version, so its Node 26 PR (#109) moved selftest and left the defaults every repo runs on 24. The same depName and datasource as setup-node's put both in one PR; tests.sh checks this reads every default and that all Node pins agree.",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^\\.github/workflows/[^/]+\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "      node-version:\\n(?:        [a-z-]+:.*\\n)*?        default: '(?<currentValue>[^']+)'"
+      ],
+      "depNameTemplate": "node",
+      "datasourceTemplate": "node-version",
+      "versioningTemplate": "node"
     }
   ],
   "packageRules": [
