@@ -276,7 +276,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         if: matrix.template == 'cf-worker-app'
         with:
-          node-version: '24'
+          node-version: '26'
       - name: Run the synced project's gates
         working-directory: synced
         run: |
@@ -334,7 +334,7 @@ jobs:
           package_json_file: render-out/package.json
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
-          node-version: '24'
+          node-version: '26'
       - name: Run the rendered project's gates
         working-directory: render-out
         # No lockfile ships in the template (new-project.sh generates it), so this
@@ -425,7 +425,7 @@ jobs:
           package_json_file: render-min/package.json
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
-          node-version: '24'
+          node-version: '26'
       - name: Run the rendered project's gates
         working-directory: render-min
         # Un-frozen install for the same reason as the all-features render: templates
