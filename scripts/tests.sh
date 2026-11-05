@@ -1379,5 +1379,58 @@ print(",".join(sorted(triggers)) + "|" + ",".join(callers))
 PY
 )"
 
+# --- cadence checklists ------------------------------------------------------------------
+
+CADENCE_DOC="$(cat <<'EOF'
+# Cadences
+
+## Monthly (1st)
+
+- [ ] **First.** One line.
+- [ ] **Second.** Wraps
+      onto a second line.
+
+Some prose that is not a checklist item.
+
+## Quarterly (Jan / Apr / Jul / Oct)
+
+- [ ] **Only.** Quarterly item.
+
+## Cut, and when each comes back
+
+- **Gone.** Not a checklist item.
+EOF
+)"
+
+check 'a cadence checklist is the items under its heading, wrapped lines joined' \
+  '- [ ] **First.** One line.|- [ ] **Second.** Wraps onto a second line.' \
+  "$(cadence_checklist monthly <<<"$CADENCE_DOC" | paste -sd '|')"
+
+check 'a cadence with no heading in the handbook has no checklist' \
+  '' \
+  "$(cadence_checklist weekly <<<"$CADENCE_DOC" 2>&1)"
+
+# The cleanup of 2026-11-03 cut the checklists to what someone will do. Growing them again
+# should be a deliberate edit to this line, not drift.
+check 'the handbook keeps two monthly items, one quarterly and no weekly checklist' \
+  'monthly=2 quarterly=1 weekly=0' \
+  "$(for cadence in monthly quarterly weekly; do
+       printf '%s=%s ' "$cadence" \
+         "$(cadence_checklist "$cadence" <"$PLATFORM_ROOT/handbook/cadences.md" | grep -c .)"
+     done | sed 's/ $//')"
+
+# Regression: cadence.yml carried its own copy of the checklists, and it had drifted from the
+# handbook (the session-log tally step was in one and not the other).
+check 'cadence.yml reads its checklist from the handbook and embeds no copy' \
+  'reads=yes copy=no' \
+  "$(python3 - "$PLATFORM_ROOT/.github/workflows/cadence.yml" <<'PY' 2>/dev/null
+import pathlib, sys, yaml
+text = pathlib.Path(sys.argv[1]).read_text()
+runs = [step.get('run') or '' for step in yaml.safe_load(text)['jobs']['open-issue']['steps']]
+reads = any('cadence_checklist' in run and 'handbook/cadences.md' in run for run in runs)
+print(f"reads={'yes' if reads else 'no'} copy={'yes' if 'CHECKLISTS' in text else 'no'}")
+PY
+)"
+
 printf '\n%d passed, %d failed\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]

@@ -8,7 +8,7 @@ everything to "later" — three is the discipline.
 |---|---|---|---|
 | **SEV1** | Page — act now | ntfy push (interrupt) | production down; data loss in progress; suspected security breach; error rate >5% for 5 min |
 | **SEV2** | Today | reviewed same day | prod degraded but a workaround holds; a security-scan finding on `main` |
-| **SEV3** | Digest | weekly cadence review | everything else worth recording |
+| **SEV3** | Digest | weekly review, paused while no alert rule can fire ([cadences](cadences.md)) | everything else worth recording |
 
 ## Rules
 
@@ -18,5 +18,6 @@ everything to "later" — three is the discipline.
   Under-paging is more expensive than one noisy alert.
 - The level is set at **declare** time (see [incident-process.md](incident-process.md))
   and may be revised as understanding changes; the final level lands in the postmortem.
-- SEV3 is not a graveyard: the weekly digest is *read*, and recurring SEV3s are a signal
-  to file a systemic fix (that is the [cadence](cadences.md) working).
+- SEV3 is not a graveyard: once an alert can fire, the weekly digest is *read*, and
+  recurring SEV3s are a signal to file a systemic fix (that is the [cadence](cadences.md)
+  working).
