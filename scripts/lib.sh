@@ -181,3 +181,17 @@ build_athena_config() { # $1=stack $2=comma targets (may be empty) $3=comma tool
        tools: ($tools | split(",") | map(select(length > 0)))
      }'
 }
+
+# Print the checklist items under the "## <Cadence> ..." heading of handbook/cadences.md (on
+# stdin), one per line with wrapped lines joined, or nothing when there is no such heading.
+# cadence.yml builds each issue from this, so the handbook is the only copy of the wording.
+cadence_checklist() { # $1=cadence, e.g. monthly
+  awk -v want="$1" '
+    /^## / { if (item != "") print item; item = ""; inside = (tolower($2) == want); next }
+    !inside { next }
+    /^- \[ \] / { if (item != "") print item; item = $0; next }
+    /^[[:space:]]+[^[:space:]]/ && item != "" { sub(/^[[:space:]]+/, ""); item = item " " $0; next }
+    { if (item != "") print item; item = "" }
+    END { if (item != "") print item }
+  '
+}

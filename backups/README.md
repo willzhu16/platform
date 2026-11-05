@@ -39,7 +39,8 @@ wrangler d1 create <project>-restore-check
 wrangler d1 execute <project>-restore-check --remote --file restore.sql
 ```
 
-The quarterly cadence issue carries this as a checklist item.
+The quarterly cadence issue carried this until 2026-11-03, when it was cut because no project
+has a database. Add it back to `handbook/cadences.md` with the first D1 binding.
 
 ## Recovery point objective
 

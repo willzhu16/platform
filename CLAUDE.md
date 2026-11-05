@@ -40,7 +40,8 @@ service to run; the deploy target is GitHub itself.
     `scripts/canary-promote.sh`), `update-major-tag.yml` (force-moves `v1` onto a given
     `vX.Y.Z`; dispatch only, regex-guarded; dispatching it by hand is the urgent-fix and
     rollback path, skipping the canary), `cadence.yml` (scheduled maintenance
-    issues; checklist text duplicated from `handbook/cadences.md` — keep in sync),
+    issues; reads each checklist from `handbook/cadences.md` at run time through
+    `cadence_checklist` in lib.sh, and closes the previous issue of that cadence),
     `history-scan.yml` (manual full-history gitleaks; hardcodes `<owner>/platform`).
 - `copier.yml` — the single question set for all templates (template, project_name,
   description, visibility, and cf-worker-only: bindings multiselect, needs_scheduled_jobs,
