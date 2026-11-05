@@ -13,7 +13,7 @@
     "automerge": true
   },
   "copier": {
-    "description": "Template updates are the monthly manual copier sweep (handbook/cadences.md), not Renovate PRs. Generated repos record their source as gh:willzhu16/platform, which Renovate cannot look up, so leaving this on only adds a lookup warning to every dashboard.",
+    "description": "Template updates reach generated repos through template-sync.yml's weekly PR, not Renovate. Generated repos record their source as gh:willzhu16/platform, which Renovate cannot look up, so leaving this on only adds a lookup warning to every dashboard.",
     "enabled": false
   },
   "packageRules": [
