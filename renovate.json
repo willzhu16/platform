@@ -1,4 +1,71 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["github>willzhu16/platform//renovate/default.json"]
+  "extends": [
+    "github>willzhu16/platform//renovate/default.json"
+  ],
+  "customManagers": [
+    {
+      "description": "Read the dependency blocks of each template's package.json.jinja. Renovate's npm manager parses only files whose names end in json, so until 2026-11-03 nothing updated these and new projects started a major behind the fleet. tests.sh checks this extracts every dependency listed.",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/(^|/)templates/[^/]+/package\\.json\\.jinja$/"
+      ],
+      "matchStringsStrategy": "recursive",
+      "matchStrings": [
+        "\"(?:dev)?[dD]ependencies\": \\{[^}]*\\}",
+        "\"(?<depName>[^\"]+)\": \"(?<currentValue>[^\"]+)\""
+      ],
+      "datasourceTemplate": "npm",
+      "versioningTemplate": "npm"
+    },
+    {
+      "description": "And the pnpm version the template pins in packageManager.",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/(^|/)templates/[^/]+/package\\.json\\.jinja$/"
+      ],
+      "matchStrings": [
+        "\"packageManager\": \"(?<depName>pnpm)@(?<currentValue>[^\"]+)\""
+      ],
+      "datasourceTemplate": "npm",
+      "versioningTemplate": "npm"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "A template change reaches a new project only with a platform release, so template updates are fix(templates), which cuts one; as chore(deps) they would merge and never ship. Monthly, because every release ends in a template-sync PR in each fleet repo.",
+      "matchFileNames": [
+        "templates/**"
+      ],
+      "semanticCommitType": "fix",
+      "semanticCommitScope": "templates",
+      "schedule": [
+        "before 06:00 on the first day of the month"
+      ]
+    },
+    {
+      "description": "Keep the template's non-major updates out of the weekly batch, so that batch stays a chore that cuts no release. They still merge themselves once green, with selftest's render jobs as the check.",
+      "matchFileNames": [
+        "templates/**"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "digest"
+      ],
+      "groupName": "template non-major dependencies"
+    },
+    {
+      "description": "Lock file maintenance lists the template's pnpm-workspace.yaml among its package files, so the template rules above would make it a weekly fix that cuts a release. Keep it the chore it was, on the preset's Monday schedule.",
+      "matchUpdateTypes": [
+        "lockFileMaintenance"
+      ],
+      "semanticCommitType": "chore",
+      "semanticCommitScope": "deps",
+      "schedule": [
+        "before 06:00 on monday"
+      ]
+    }
+  ]
 }

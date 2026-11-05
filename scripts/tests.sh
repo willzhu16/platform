@@ -253,6 +253,44 @@ print(','.join(sorted(set(failures))))
 PY
 )"
 
+# Regression: Renovate read no template package.json.jinja (its npm manager parses only files
+# named *json), so new projects started a major behind the fleet (vitest 4 while canary-worker
+# ran 5) and platform's render jobs tested the old versions. renovate.json reads the file with
+# a regex manager instead; this runs that manager's regexes the way Renovate does and fails for
+# any dependency the file lists that they miss.
+check 'Renovate extracts every dependency each template package.json.jinja lists' \
+  '' \
+  "$(python3 - "$PLATFORM_ROOT" <<'PY' 2>/dev/null
+import json, pathlib, re, sys
+root = pathlib.Path(sys.argv[1])
+
+def python_regex(pattern):
+    return re.compile(re.sub(r'\(\?<(?=[A-Za-z])', '(?P<', pattern.strip('/')))
+
+managers = json.loads((root / 'renovate.json').read_text()).get('customManagers', [])
+failures = []
+for path in sorted(root.glob('templates/*/package.json.jinja')):
+    relative, text = str(path.relative_to(root)), path.read_text()
+    try:
+        package = json.loads(text)
+    except ValueError:
+        failures.append(relative + ': not JSON, so the expected dependencies are unknown')
+        continue
+    expected = set(package.get('dependencies', {})) | set(package.get('devDependencies', {}))
+    found = set()
+    for manager in managers:
+        if not any(python_regex(p).search(relative) for p in manager.get('managerFilePatterns', [])):
+            continue
+        regions = [text]
+        for pattern in manager['matchStrings']:
+            matches = [m for region in regions for m in python_regex(pattern).finditer(region)]
+            regions = [m.group(0) for m in matches]
+        found |= {m.group('depName') for m in matches if 'depName' in m.groupdict()}
+    failures += [f'{relative}: {name} not extracted' for name in sorted(expected - found)]
+print(','.join(failures))
+PY
+)"
+
 check 'third-party Actions are pinned and data inputs stay out of shell source' \
   '' \
   "$(python3 - "$PLATFORM_ROOT" <<'PY' 2>/dev/null
@@ -1395,6 +1433,59 @@ triggers = doc.get("on", doc.get(True))
 callers = sorted(path.name for path in root.glob("*.yml")
                  if path.name != "update-major-tag.yml" and "update-major-tag.yml" in path.read_text())
 print(",".join(sorted(triggers)) + "|" + ",".join(callers))
+PY
+)"
+
+# --- cadence checklists ------------------------------------------------------------------
+
+CADENCE_DOC="$(cat <<'EOF'
+# Cadences
+
+## Monthly (1st)
+
+- [ ] **First.** One line.
+- [ ] **Second.** Wraps
+      onto a second line.
+
+Some prose that is not a checklist item.
+
+## Quarterly (Jan / Apr / Jul / Oct)
+
+- [ ] **Only.** Quarterly item.
+
+## Cut, and when each comes back
+
+- **Gone.** Not a checklist item.
+EOF
+)"
+
+check 'a cadence checklist is the items under its heading, wrapped lines joined' \
+  '- [ ] **First.** One line.|- [ ] **Second.** Wraps onto a second line.' \
+  "$(cadence_checklist monthly <<<"$CADENCE_DOC" | paste -sd '|')"
+
+check 'a cadence with no heading in the handbook has no checklist' \
+  '' \
+  "$(cadence_checklist weekly <<<"$CADENCE_DOC" 2>&1)"
+
+# The cleanup of 2026-11-03 cut the checklists to what someone will do. Growing them again
+# should be a deliberate edit to this line, not drift.
+check 'the handbook keeps two monthly items, one quarterly and no weekly checklist' \
+  'monthly=2 quarterly=1 weekly=0' \
+  "$(for cadence in monthly quarterly weekly; do
+       printf '%s=%s ' "$cadence" \
+         "$(cadence_checklist "$cadence" <"$PLATFORM_ROOT/handbook/cadences.md" | grep -c .)"
+     done | sed 's/ $//')"
+
+# Regression: cadence.yml carried its own copy of the checklists, and it had drifted from the
+# handbook (the session-log tally step was in one and not the other).
+check 'cadence.yml reads its checklist from the handbook and embeds no copy' \
+  'reads=yes copy=no' \
+  "$(python3 - "$PLATFORM_ROOT/.github/workflows/cadence.yml" <<'PY' 2>/dev/null
+import pathlib, sys, yaml
+text = pathlib.Path(sys.argv[1]).read_text()
+runs = [step.get('run') or '' for step in yaml.safe_load(text)['jobs']['open-issue']['steps']]
+reads = any('cadence_checklist' in run and 'handbook/cadences.md' in run for run in runs)
+print(f"reads={'yes' if reads else 'no'} copy={'yes' if 'CHECKLISTS' in text else 'no'}")
 PY
 )"
 
