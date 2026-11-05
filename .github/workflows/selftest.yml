@@ -373,6 +373,10 @@ jobs:
           scan-args: |-
             --recursive
             ./render-out
+      - name: Remove the render's temporary repo
+        # A later step runs copier on this checkout, and git will not stage a nested repo that
+        # has no commit, so the private py-tool render failed until this went in.
+        run: rm -rf render-out/.git
       - name: Assert the Workers fitness rules reject a violation
         working-directory: render-out
         # `pnpm lint` passing above only proves the config parses, because the template's
@@ -518,6 +522,10 @@ jobs:
           scan-args: |-
             --recursive
             ./render-out
+      - name: Remove the render's temporary repo
+        # A later step runs copier on this checkout, and git will not stage a nested repo that
+        # has no commit, so the private py-tool render failed until this went in.
+        run: rm -rf render-out/.git
       - name: Assert the Python fitness rules reject a violation
         working-directory: render-out
         # `ruff check` passing above only proves the config parses, because the template's own
