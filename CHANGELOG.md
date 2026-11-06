@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.16.1](https://github.com/willzhu16/platform/compare/v1.16.0...v1.16.1) (2026-11-06)
+
+
+### Bug Fixes
+
+* **templates:** move the worker template to Sentry 11 ([#118](https://github.com/willzhu16/platform/issues/118)) ([a977700](https://github.com/willzhu16/platform/commit/a977700789a69527c973cde86cecedd90dcb7c70))
+
 ## [1.16.0](https://github.com/willzhu16/platform/compare/v1.15.2...v1.16.0) (2026-11-06)
 
 
