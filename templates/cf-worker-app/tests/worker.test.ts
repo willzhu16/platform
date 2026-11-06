@@ -134,14 +134,23 @@ describe('the request contract', () => {
 describe('sentryOptions', () => {
   it('keeps tracing off and PII out', () => {
     // Both are cost and privacy controls rather than preferences: tracing on would leave
-    // the free quota, and sendDefaultPii would ship request data to a third party.
+    // the free quota, and Sentry 11 collects user and request data unless told not to.
     const options = sentryOptions({
       PROJECT_VERSION: 'v1.2.3',
       SENTRY_DSN: 'https://k@o0.in/0',
     } as never);
 
     expect(options.tracesSampleRate).toBe(0);
-    expect(options.sendDefaultPii).toBe(false);
+    expect(options.dataCollection).toEqual({
+      userInfo: false,
+      cookies: false,
+      httpHeaders: false,
+      httpBodies: [],
+      urlQueryParams: false,
+      databaseQueryData: false,
+      queues: false,
+      stackFrameVariables: false,
+    });
     expect(options.dsn).toBe('https://k@o0.in/0');
     expect(options.release).toBe('v1.2.3');
   });
