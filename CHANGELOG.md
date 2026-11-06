@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.16.0](https://github.com/willzhu16/platform/compare/v1.15.2...v1.16.0) (2026-11-06)
+
+
+### Features
+
+* **ci:** move every workflow to Node 26 ([#116](https://github.com/willzhu16/platform/issues/116)) ([8165b42](https://github.com/willzhu16/platform/commit/8165b42ebcf391ec0efd40d260695e27aca4facd))
+
 ## [1.15.2](https://github.com/willzhu16/platform/compare/v1.15.1...v1.15.2) (2026-11-01)
 
 
