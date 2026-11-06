@@ -291,6 +291,59 @@ print(','.join(failures))
 PY
 )"
 
+# Regression: Renovate's Node 26 PR (#109) moved the literal setup-node pins but not the
+# `node-version` input defaults that every repo's CI runs, because it does not read a
+# workflow_call default. Merged alone, selftest would have tested on 26 while the fleet ran 24.
+check 'Renovate reads every node-version input default' \
+  '' \
+  "$(python3 - "$PLATFORM_ROOT" <<'PY' 2>/dev/null
+import json, pathlib, re, sys, yaml
+root = pathlib.Path(sys.argv[1])
+
+def python_regex(pattern):
+    return re.compile(re.sub(r'\(\?<(?=[A-Za-z])', '(?P<', pattern.strip('/')))
+
+managers = [m for m in json.loads((root / 'renovate.json').read_text()).get('customManagers', [])
+            if m.get('depNameTemplate') == 'node']
+failures = []
+for path in sorted((root / '.github/workflows').glob('*.yml')):
+    relative, text = str(path.relative_to(root)), path.read_text()
+    document = yaml.safe_load(text) or {}
+    triggers = document.get('on', document.get(True))
+    inputs = ((triggers or {}).get('workflow_call') or {}).get('inputs') or {} if isinstance(triggers, dict) else {}
+    if 'node-version' not in inputs:
+        continue
+    found = [match.group('currentValue') for manager in managers
+             if any(python_regex(p).search(relative) for p in manager['managerFilePatterns'])
+             for pattern in manager['matchStrings'] for match in python_regex(pattern).finditer(text)]
+    if found != [str(inputs['node-version'].get('default'))]:
+        failures.append(f'{relative}: read {found or "nothing"}')
+print(','.join(failures))
+PY
+)"
+
+check 'every Node version platform pins is the same one' \
+  '1' \
+  "$(python3 - "$PLATFORM_ROOT" <<'PY' 2>/dev/null
+import pathlib, sys, yaml
+root = pathlib.Path(sys.argv[1])
+pins = {}
+paths = list((root / '.github/workflows').glob('*.yml')) + list(root.glob('templates/*/.github/workflows/*'))
+for path in sorted(paths):
+    document = yaml.safe_load(path.read_text()) or {}
+    triggers = document.get('on', document.get(True))
+    inputs = ((triggers or {}).get('workflow_call') or {}).get('inputs') or {} if isinstance(triggers, dict) else {}
+    if 'node-version' in inputs:
+        pins.setdefault(str(inputs['node-version'].get('default')), []).append(path.name)
+    for job in (document.get('jobs') or {}).values():
+        for step in job.get('steps') or []:
+            value = str((step.get('with') or {}).get('node-version', ''))
+            if step.get('uses', '').startswith('actions/setup-node@') and value and '${{' not in value:
+                pins.setdefault(value, []).append(path.name)
+print(len(pins) if len(pins) == 1 else {version: sorted(set(names)) for version, names in pins.items()})
+PY
+)"
+
 check 'third-party Actions are pinned and data inputs stay out of shell source' \
   '' \
   "$(python3 - "$PLATFORM_ROOT" <<'PY' 2>/dev/null

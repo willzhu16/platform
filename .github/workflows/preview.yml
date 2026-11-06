@@ -29,7 +29,7 @@ on:
         default: '.'
       node-version:
         type: string
-        default: '24'
+        default: '26'
     secrets:
       CLOUDFLARE_API_TOKEN:
         # Optional: a caller usually has no repository secret of this name, so what it passes
