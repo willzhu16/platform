@@ -47,7 +47,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: docker://koalaman/shellcheck@sha256:5dd00cd58babeaa9c2abaa3f454ce75d21d12ae4a36e38c1458e19135fdcc255 # v0.11.0
+      - uses: docker://koalaman/shellcheck@sha256:c1b1b6e09fdd44eea6130afa96f68c316d717678238d16f811e98306f4ae93fd # v0.11.0
         with:
           args: >-
             --severity=warning scripts/new-project.sh scripts/setup-machine.sh
@@ -211,7 +211,7 @@ jobs:
       - name: List every package osv-scanner reads
         # Exits 1 on any advisory; only the package list matters here.
         continue-on-error: true
-        uses: google/osv-scanner-action/osv-scanner-action@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
+        uses: google/osv-scanner-action/osv-scanner-action@32d3cd482bdadfb38b186c0ad1b031902d55d932 # v2.7.1
         with:
           scan-args: |-
             --format=json
@@ -269,7 +269,7 @@ jobs:
             updated*) ;;
             *) echo "::error::syncing $previous to this commit did not apply cleanly: $result"; exit 1 ;;
           esac
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         if: matrix.template == 'cf-worker-app'
         with:
           package_json_file: synced/package.json
@@ -329,7 +329,7 @@ jobs:
           EOF
           uvx --from copier copier copy --defaults --vcs-ref HEAD \
             --data-file "$RUNNER_TEMP/answers.yml" . render-out
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         with:
           package_json_file: render-out/package.json
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
@@ -357,7 +357,7 @@ jobs:
       - name: List every package osv-scanner reads in the render
         # Exits 1 on any advisory; the scan below is the step that reports those.
         continue-on-error: true
-        uses: google/osv-scanner-action/osv-scanner-action@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
+        uses: google/osv-scanner-action/osv-scanner-action@32d3cd482bdadfb38b186c0ad1b031902d55d932 # v2.7.1
         with:
           scan-args: |-
             --format=json
@@ -368,7 +368,7 @@ jobs:
       - name: Verify osv-scanner read the render's lockfile
         run: bash scripts/osv-coverage.sh .artemis-osv-packages.json render-out /github/workspace/render-out
       - name: Scan the render with osv
-        uses: google/osv-scanner-action/osv-scanner-action@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
+        uses: google/osv-scanner-action/osv-scanner-action@32d3cd482bdadfb38b186c0ad1b031902d55d932 # v2.7.1
         with:
           scan-args: |-
             --recursive
@@ -450,7 +450,7 @@ jobs:
             fi
           done
           exit "$rendered"
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         with:
           package_json_file: render-min/package.json
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
@@ -506,7 +506,7 @@ jobs:
       - name: List every package osv-scanner reads in the render
         # Exits 1 on any advisory; the scan below is the step that reports those.
         continue-on-error: true
-        uses: google/osv-scanner-action/osv-scanner-action@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
+        uses: google/osv-scanner-action/osv-scanner-action@32d3cd482bdadfb38b186c0ad1b031902d55d932 # v2.7.1
         with:
           scan-args: |-
             --format=json
@@ -517,7 +517,7 @@ jobs:
       - name: Verify osv-scanner read the render's lockfile
         run: bash scripts/osv-coverage.sh .artemis-osv-packages.json render-out /github/workspace/render-out
       - name: Scan the render with osv
-        uses: google/osv-scanner-action/osv-scanner-action@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
+        uses: google/osv-scanner-action/osv-scanner-action@32d3cd482bdadfb38b186c0ad1b031902d55d932 # v2.7.1
         with:
           scan-args: |-
             --recursive
