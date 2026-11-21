@@ -204,7 +204,7 @@ jobs:
         # It exits 1 whenever it finds an advisory. The scan below is the step that reports
         # those; this one only has to leave its package list behind.
         continue-on-error: true
-        uses: google/osv-scanner-action/osv-scanner-action@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
+        uses: google/osv-scanner-action/osv-scanner-action@32d3cd482bdadfb38b186c0ad1b031902d55d932 # v2.7.1
         with:
           scan-args: |-
             --format=json
@@ -231,7 +231,7 @@ jobs:
         # 'auto' scans the repo recursively (osv-scanner finds every supported lockfile);
         # pass explicit paths via the osv-lockfiles input when auto-detection misfires.
         # An in-repo osv-scanner.toml may ignore specific advisory IDs (spec 02 §3.3).
-        uses: google/osv-scanner-action/osv-scanner-action@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
+        uses: google/osv-scanner-action/osv-scanner-action@32d3cd482bdadfb38b186c0ad1b031902d55d932 # v2.7.1
         with:
           scan-args: |-
             --recursive
