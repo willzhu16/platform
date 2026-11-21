@@ -12,12 +12,12 @@ name: release-reusable
 # not merely that wrangler exited 0. It detects, it does not protect: a failed smoke
 # leaves the bad version live, so roll back via the workflow_dispatch path above.
 #
-# Callers trigger on `push: tags: v*` and also expose `workflow_dispatch` with a `tag`
-# input forwarded here, so the rollback runbook's
+# Callers trigger only on `workflow_dispatch`, with a `tag` input forwarded here: the
+# template's release-please.yml dispatches each new tag, and the rollback runbook's
 # `gh workflow run release.yml --ref vX.Y.Z -f tag=vX.Y.Z` redeploys an exact earlier
-# version. Dispatch ON THE TAG REF: the production environment only admits v* tag refs,
-# and release-please's GITHUB_TOKEN tags never fire `push: tags` on their own, so the
-# template's release-please.yml dispatches this workflow the same way.
+# version. Dispatch ON THE TAG REF: the production environment only admits v* tag refs. A
+# `push: tags` trigger as well runs every release twice once release-please tags with
+# AUTOMATION_TOKEN, and the run that loses the race to upload the artifact fails.
 #
 # Secrets: deploying callers pass CLOUDFLARE_API_TOKEN by name, and the deploy job runs in
 # the CALLER's `production` environment, whose secret of that name is the value it receives.

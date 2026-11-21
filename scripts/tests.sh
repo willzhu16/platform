@@ -253,6 +253,32 @@ print(','.join(sorted(set(failures))))
 PY
 )"
 
+# Regression: release-please tags with AUTOMATION_TOKEN, whose tag pushes do start workflows, and
+# also dispatches release.yml, so a `push: tags` trigger ran every release twice. The run that
+# lost the race to upload the artifact failed (canary-worker v1.0.1). Prints what it checked, so
+# a template that stops dispatching anything cannot pass by checking nothing.
+check 'a workflow a template dispatches has no other trigger' \
+  'cf-worker-app/release.yml,py-tool/release.yml|' \
+  "$(python3 - "$PLATFORM_ROOT" <<'PY' 2>/dev/null
+import pathlib, re, sys, yaml
+root = pathlib.Path(sys.argv[1])
+checked, failures = [], []
+for workflows in sorted((root / 'templates').glob('*/.github/workflows')):
+    template = workflows.parent.parent.name
+    dispatched = set()
+    for path in workflows.iterdir():
+        dispatched |= set(re.findall(r'gh workflow run (\S+\.ya?ml)', path.read_text()))
+    for name in sorted(dispatched):
+        document = yaml.safe_load((workflows / name).read_text()) or {}
+        triggers = document.get('on', document.get(True))
+        triggers = [triggers] if isinstance(triggers, str) else sorted(triggers or [])
+        checked.append(f'{template}/{name}')
+        if triggers != ['workflow_dispatch']:
+            failures.append(f'{template}/{name}:{"+".join(triggers)}')
+print(','.join(checked) + '|' + ','.join(failures))
+PY
+)"
+
 # Regression: Renovate read no template package.json.jinja (its npm manager parses only files
 # named *json), so new projects started a major behind the fleet (vitest 4 while canary-worker
 # ran 5) and platform's render jobs tested the old versions. renovate.json reads the file with

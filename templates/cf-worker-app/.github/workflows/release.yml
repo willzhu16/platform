@@ -1,13 +1,13 @@
 name: release
 
+# Started only by dispatch on a tag ref: release-please.yml hands over each new tag this way,
+# and the rollback runbook redeploys an earlier one. A `push: tags` trigger as well would run
+# every release twice when release-please tags with AUTOMATION_TOKEN.
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing vX.Y.Z tag to rebuild and redeploy (rollback runbook)
+        description: vX.Y.Z tag to build and deploy (release-please passes the new one)
         required: true
         type: string
 
